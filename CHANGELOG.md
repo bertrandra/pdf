@@ -5,7 +5,34 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 
 ## [Non publié]
 
+Version majeure (ADR-0008) : pour les mêmes sources et le même montage, un PDF à signets, liens ou annotations
+s'écrit autrement. Un PDF sans rien de cela garde ses octets.
+
+### Modifié
+
+- Les signets, les liens internes et les champs de formulaire suivent les pages dans la fusion, le découpage et la
+  scission : un signet dont la page est coupée part (ou mène à la première page gardée sous lui), un lien vers une
+  page absente est retiré, deux champs de même nom venus de deux fichiers ne partagent plus leur valeur (`nom_2`).
+- Un lien vers une autre page n'entraîne plus dans le fichier une copie orpheline de la page visée.
+- Scinder lit chaque fichier une seule fois pour toutes les parties, au lieu d'une fois par partie.
+- La boîte « Convertir » propose aussi le PDF cherchable et les images.
+
+### Ajouté
+
+- Arrêter une scission ou une conversion en cours (« Arrêter » sur la roue d'attente, ou Échap) ; rien n'est
+  enregistré, et la page le dit.
+- Le navigateur demande confirmation avant de fermer ou de recharger une page qui a du travail.
+- PDF cherchable : les pages scannées reçoivent une couche de texte invisible, posée sur leurs lignes ; les autres
+  pages ne changent pas. Le fichier s'appelle `<nom>-cherchable.pdf`.
+- Export en images : une image PNG par page, à 150 dpi, en ZIP s'il y en a plusieurs.
+- Numéroter les pages : position, format (« 3 », « 3 / 12 », « Page 3 sur 12 »), premier numéro, couverture sans
+  numéro ; à l'endroit sur une page tournée, et annulable.
+- Dupliquer les pages choisies (bouton ou Ctrl+D), insérer une page blanche de la taille de sa voisine.
+
 ### Corrigé
+
+- Un PDF protégé dit s'il demande un mot de passe pour s'ouvrir, ou si son auteur en interdit seulement la
+  modification (le cas des relevés et factures protégés).
 
 - La page se charge chez un hébergeur qui ne donne pas de type aux fichiers `.mjs` (SiteGround) : pdf.js est livré en
   `.js`, et la construction refuse tout fichier `.mjs` dans `dist/`. Une source que pdf.js n'a pas pu ouvrir est

@@ -20,9 +20,27 @@ Trois paris en découlent :
 3. **Coller aux obligations françaises.** Facturation électronique (Factur-X), anonymisation (RGPD),
    accessibilité (RGAA), archivage (PDF/A) : des contraintes légales qui créent un besoin qu'on ne choisit pas.
 
-## Horizon 0 — le socle (dès maintenant)
+## Horizon 0 — le socle (fait)
 
-Ce qu'il faut réparer avant de vendre quoi que ce soit.
+Ce qu'il fallait réparer avant de vendre quoi que ce soit. **Fait**, sauf mention contraire (ADR-0008, `CHANGELOG.md`) :
+
+| N° | Quoi | Où |
+|---|---|---|
+| 1 | Signets, liens, champs suivent les pages ; plus de page orpheline | `export/structure.ts`, `engine/signets.ts` |
+| 2 | Une scission lit ses sources une fois | `preparer` / `assemblerPrepare` |
+| 3 | Confirmation avant de quitter ; **la reprise de séance reste à faire** (offre Pro) | `zones/Application.tsx` |
+| 4 | « Arrêter » une scission ou une conversion (Échap) | `zones/atelier.ts`, `io/conversion.ts` |
+| 5 | PDF protégé : mot de passe d'ouverture ou protection du propriétaire, dit tel quel ; **les rouvrir reste à faire** (déchiffrer demande RC4/AES dans `io`) | `io/apercu.ts`, `protectionDe` |
+| 6 | PDF cherchable | `io/conversion.ts`, `export/surimpression.ts` |
+| 7 | Dupliquer, page blanche, numéroter, images | `engine/montage.ts`, `engine/numerotation.ts`, `geometry/repere.ts` |
+| 8 | État de la page testé en Node ; `io/conversion.ts` couvert dans le navigateur | `tests/unit/zones`, `tests/e2e` |
+| 9 | Plus de bruit de pdf-lib sur stderr | `tests/unit/io/lecture.test.ts` |
+
+Détails vérifiés : les octets d'une source sont gardés une fois sur le fil principal ; pdf.js en reçoit une copie
+pour son fil de travail, qu'il détache — elle ne peut pas être partagée. La lecture partielle (un fichier refusé
+n'empêche pas les autres) est testée (`integrerFichiers`).
+
+Ce qui était relevé :
 
 ### Ce qui perd des données ou du temps
 
@@ -98,6 +116,8 @@ Ce qui fait passer de « fusionner et convertir » à « je n'ouvre plus Acrobat
 
 ## Horizon 3 — l'intelligence, sur place (12 mois et plus)
 
+Spécifié dans `docs/specs/horizon-3/` : recettes, preuve de fabrication, modèle local, classer et nommer.
+
 - **Un modèle de langue local** (WebGPU, épinglé par sha256 comme les modèles OCR, servi depuis `dist/`) : résumer
   un document, poser une question à un dossier de 300 pages et voir la page qui répond, traduire en gardant la mise
   en page (le texte est déjà en lignes à leur place). La règle ne bouge pas : aucune requête hors de la page.
@@ -139,7 +159,8 @@ service en ligne, mais peut copier un dossier sur son intranet. Aucun concurrent
   constructions : `pdf.html` et `pdf-premium.html`, et les modèles OCR seulement dans la seconde), ce qui allège aussi
   la page gratuite.
 - **La licence du dépôt** (`UNLICENSED`, dépôt privé) est à trancher avant toute distribution payante.
-- La frontière entre les offres, la forme de la clé et les constructions séparées méritent un ADR (ADR-0008) ; chaque
+- La frontière entre les offres, la forme de la clé et les constructions séparées méritent un ADR (à numéroter :
+  l'ADR-0008 est pris par ce qui survit à l'écriture) ; chaque
   horizon aussi, au moment de s'y engager (signature, Factur-X, IA locale : un ADR chacun, mesuré comme l'ADR-0007).
 
 ## Ce qui peut faire échouer le plan

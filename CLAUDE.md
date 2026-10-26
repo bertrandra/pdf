@@ -5,8 +5,8 @@ l'architecture de `svg` (mêmes couches, mêmes conventions, mêmes garde-fous).
 
 ## Le projet en une phrase
 
-Une page autonome pour fusionner, découper, scinder des PDF et les convertir en PowerPoint ou en Word, avec une
-grille de vignettes zoomable et un aperçu en grand. **Un PDF écrit aujourd'hui doit l'être à l'identique demain** : mêmes sources et même montage,
+Une page autonome pour fusionner, découper, scinder, numéroter des PDF et les convertir en PowerPoint, en Word, en PDF
+cherchable ou en images, avec une grille de vignettes zoomable et un aperçu en grand. **Un PDF écrit aujourd'hui doit l'être à l'identique demain** : mêmes sources et même montage,
 mêmes octets. Un changement qui déplace un octet écrit est un événement de version majeure, jamais une
 correction discrète.
 
@@ -75,6 +75,11 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   sont épinglés par étiquette et sha256 (`data/modeles-ocr.json`, `scripts/modeles-ocr.mjs`, cache `.cache/ocr/`).
   Seule une ligne sûre devient du texte et s'efface du scan (`engine/ocr.ts`) ; changer de modèle se mesure d'abord
   (taux d'erreur par caractère, voir l'ADR). Tesseract ne vit que dans `io/ocr.ts`.
+- **Ce qui suit les pages, ce qui s'y ajoute** (ADR-0008) : signets, liens internes et champs suivent les pages posées
+  (`export/structure.ts`, préparation d'une source avant toute copie, puis achèvement du document) ; une scission
+  prépare ses sources une fois. Numéros et couche de texte d'un scan se posent dans le repère vu
+  (`geometry/repere.ts`), en flux à part entouré de q/Q, police Helvetica à clé fixe : jamais `uniqueKey` de pdf-lib,
+  qui tire au hasard.
 - **Une couleur d'interface est un jeton** (ADR-0004) : `src/styles/jetons.ts` (couleurs, mêmes valeurs que
   `svg`), `typographie.ts` et `espaces.ts` sont la seule source ; le CSS des variables se génère au build ; la
   feuille `outils/pdf/page.css` n'écrit aucune couleur, taille de texte, rayon ni couche ; chaque texte tient
@@ -86,5 +91,5 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   servis avec elle (un test de navigateur le vérifie). Le seul `fetch` de `src/` lit les modèles OCR (`io/ocr.ts`).
   Un PDF illisible, chiffré ou qui n'en est pas un est refusé en le nommant, sans lever (`io/lecture.ts`).
 - **La page se pilote sans souris** : la grille est une `listbox` à une seule tabulation (flèches, Maj, Espace,
-  Ctrl+A, Alt+flèches pour ranger, R pour tourner, Suppr, Entrée pour l'aperçu, + et − pour zoomer) ; une seule
+  Ctrl+A, Alt+flèches pour ranger, R pour tourner, Ctrl+D pour dupliquer, Suppr, Entrée pour l'aperçu, + et − pour zoomer) ; une seule
   région `polite` dit ce qui vient de se passer ; `axe-core` échoue sur toute violation grave en test de navigateur.
