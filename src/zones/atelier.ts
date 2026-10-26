@@ -34,7 +34,8 @@ export function useAtelier() {
   const [selection, setSelection] = useState<Selection>(SELECTION_VIDE);
   const [palier, setPalier] = useState(PALIER_DEFAUT);
   const [message, setMessage] = useState<Message | null>(null);
-  const [occupe, setOccupe] = useState(false);
+  /** Ce que la page est en train de faire (« Lecture des fichiers… »), ou null : la roue d'attente l'affiche. */
+  const [travail, setTravail] = useState<string | null>(null);
   const octets = useRef(new Map<string, Uint8Array>());
   // Le dernier etat rendu, pour les gestes asynchrones : un ajout calcule ses identifiants sur le montage du moment.
   const dernier = useRef(h);
@@ -49,7 +50,7 @@ export function useAtelier() {
   const ajouterFichiers = useCallback(async (fichiers: readonly File[], avant?: number) => {
     const pdfs = fichiers.filter(fichierPdf);
     const refus = fichiers.filter(f => !fichierPdf(f)).map(f => '« ' + f.name + ' » n’est pas un PDF.');
-    setOccupe(true);
+    setTravail('Lecture des fichiers…');
     const lus: { nom: string; octets: Uint8Array; pages: Awaited<ReturnType<typeof lirePdf>> }[] = [];
     for (const f of pdfs) {
       try {
@@ -59,7 +60,7 @@ export function useAtelier() {
         refus.push('« ' + f.name + ' » : ' + raison(e));
       }
     }
-    setOccupe(false);
+    setTravail(null);
     let m = dernier.current.present, position = avant ?? m.pages.length, ajoutees = 0;
     for (const l of lus) {
       if ('erreur' in l.pages) { refus.push('« ' + l.nom + ' » : ' + l.pages.erreur); continue; }
@@ -89,14 +90,14 @@ export function useAtelier() {
 
   /** Ecrit un montage et le telecharge ; le message dit ce qui est parti, ou pourquoi rien n'est parti. */
   const enregistrer = useCallback(async (m: Montage, nom: string) => {
-    setOccupe(true);
+    setTravail('Écriture du PDF…');
     try {
       const remise = await telecharger(await assembler(m, octets.current), nom, 'application/pdf');
       setMessage(remise === 'refuse' ? ANNULE : { type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
     } catch (e) {
       setMessage({ type: 'echec', texte: raison(e) });
     } finally {
-      setOccupe(false);
+      setTravail(null);
     }
   }, []);
 
@@ -105,7 +106,7 @@ export function useAtelier() {
     const parties = scinder(montage, regle);
     const base = nomDeSortie(montage);
     const noms = nomsDesParties(base, parties.length);
-    setOccupe(true);
+    setTravail('Écriture des fichiers…');
     try {
       const fichiers = [];
       for (const [k, p] of parties.entries()) fichiers.push({ nom: noms[k] ?? 'partie.pdf', donnees: await assembler(p, octets.current) });
@@ -118,7 +119,7 @@ export function useAtelier() {
     } catch (e) {
       setMessage({ type: 'echec', texte: raison(e) });
     } finally {
-      setOccupe(false);
+      setTravail(null);
     }
   }, [montage]);
 
@@ -129,10 +130,10 @@ export function useAtelier() {
   const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean, ocr: boolean) => {
     const m = seulementChoisies ? { ...montage, pages: montage.pages.filter(p => selection.ids.has(p.id)) } : montage;
     const nom = nomDeSortie(montage).replace(/\.pdf$/i, '') + '.' + EXTENSIONS[format];
-    setOccupe(true);
+    setTravail('Préparation de la conversion…');
     try {
       const octetsConvertis = await convertir(m, format, ocr, (fait, total, reconnaissance) => {
-        setMessage({ type: 'info', texte: (reconnaissance ? 'Reconnaissance du texte (OCR) : page ' : 'Conversion : page ') + fait + ' sur ' + total + '…' });
+        setTravail((reconnaissance ? 'Reconnaissance du texte (OCR) : page ' : 'Conversion : page ') + fait + ' sur ' + total + '…');
       });
       const remise = await telecharger(octetsConvertis, nom, TYPES_MIME[format]);
       if (remise === 'refuse') setMessage(ANNULE);
@@ -140,7 +141,7 @@ export function useAtelier() {
     } catch (e) {
       setMessage({ type: 'echec', texte: 'La conversion a échoué : ' + raison(e) });
     } finally {
-      setOccupe(false);
+      setTravail(null);
     }
   }, [montage, selection]);
 
@@ -154,7 +155,7 @@ export function useAtelier() {
 
   return {
     montage, peutAnnuler: h.passe.length > 0, peutRetablir: h.futur.length > 0,
-    selection, setSelection, palier, setPalier, message, setMessage, occupe,
+    selection, setSelection, palier, setPalier, message, setMessage, travail, occupe: travail !== null,
     ajouterFichiers, enregistrer, enregistrerScission, convertirEn, ...verbes
   };
 }

@@ -181,7 +181,12 @@ describe('la page', () => {
       await expect.poll(() => boite.getByRole('checkbox', { name: /Reconnaître le texte/ }).isChecked()).toBe(true);
       const telechargement = page.waitForEvent('download', { timeout: 120_000 });
       await boite.getByRole('button', { name: 'Convertir la page' }).click();
+      // Pendant la reconnaissance, la roue d'attente dit ce qui se fait, et la page ne se modifie pas.
+      await expect.poll(() => page.locator('.attente').textContent(), { timeout: 30_000 }).toContain('page 1 sur 1');
+      expect(await page.locator('main').getAttribute('inert')).not.toBeNull();
       const fichier = await telechargement;
+      await expect.poll(() => page.locator('.attente').count()).toBe(0);
+      expect(await page.locator('main').getAttribute('inert')).toBeNull();
       expect(fichier.suggestedFilename()).toBe(nom);
       const archive = lireZip(new Uint8Array(readFileSync(await fichier.path())));
       const tout = [...archive.keys()].filter(n => n.endsWith('.xml')).map(n => texte(archive, n)).join('');

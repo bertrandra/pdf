@@ -122,3 +122,4 @@ Généré depuis `src/styles/` par `ACTUALISER_REFERENCES=1 npx vitest run tests
 | `--couche-barre` | `10` | La barre d’outils, collée en haut quand la grille défile |
 | `--couche-apercu` | `1000` | L’aperçu d’une page en grand, au-dessus de la grille |
 | `--couche-dialogue` | `1200` | Le voile et la boîte de scission |
+| `--couche-attente` | `1300` | La roue d’attente au milieu de l’écran, au-dessus de tout pendant un travail |

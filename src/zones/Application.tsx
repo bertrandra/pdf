@@ -9,6 +9,7 @@ import { largeurVignette, palierVoisin, PALIERS_VIGNETTE } from '../engine/zoom.
 import { useAtelier, nomDeSortie, type Atelier } from './atelier.js';
 import { Apercu } from './Apercu.js';
 import { Grille } from './Grille.js';
+import { Attente } from './Attente.js';
 import { Convertir } from './Convertir.js';
 import { Scinder } from './Scinder.js';
 
@@ -50,7 +51,7 @@ function Barre({ atelier, ajouter, scinder, convertir }: { atelier: Atelier; ajo
   const vide = montage.pages.length === 0, aucune = selection.ids.size === 0;
   const n = selection.ids.size;
   return (
-    <header className="barre" aria-label="Outils">
+    <header className="barre" aria-label="Outils" inert={occupe}>
       <div className="groupe">
         <button type="button" onClick={ajouter}>Ajouter des PDF…</button>
         <button type="button" onClick={atelier.annuler} disabled={!atelier.peutAnnuler} title="Annuler (Ctrl+Z)">Annuler</button>
@@ -88,13 +89,14 @@ export function Application() {
   // Ctrl+Z et Ctrl+Maj+Z (ou Ctrl+Y) partout, sauf dans un champ ou ils defont la saisie.
   useEffect(() => {
     const touche = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).closest('input, textarea') !== null) return;
+      // Pendant un travail, la page ne change pas : annuler ou retablir attendront qu'il soit fini.
+      if (atelier.occupe || !(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).closest('input, textarea') !== null) return;
       if (e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) atelier.retablir(); else atelier.annuler(); }
       else if (e.key.toLowerCase() === 'y') { e.preventDefault(); atelier.retablir(); }
     };
     addEventListener('keydown', touche);
     return () => removeEventListener('keydown', touche);
-  }, [atelier.annuler, atelier.retablir]);
+  }, [atelier.annuler, atelier.retablir, atelier.occupe]);
 
   useEffect(() => { if (apercu !== null && !montage.pages.some(p => p.id === apercu)) setApercu(null); }, [montage, apercu]);
 
@@ -110,10 +112,10 @@ export function Application() {
       <Barre atelier={atelier} ajouter={() => choix.current?.click()} scinder={() => setScission(true)} convertir={() => setConversion(true)} />
       <p className="etat" role="status" aria-live="polite">
         {message ? <span className={'message ' + message.type}>{message.texte}</span> : null}
-        {atelier.occupe ? <span className="discret-texte"> Un instant…</span> : null}
+        {atelier.travail !== null ? <span className="discret-texte"> {atelier.travail}</span> : null}
       </p>
       {montage.pages.length === 0 ? (
-        <main className={'depot' + (survol ? ' survol' : '')}
+        <main className={'depot' + (survol ? ' survol' : '')} inert={atelier.occupe}
           onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setSurvol(true); } }}
           onDragLeave={() => setSurvol(false)}
           onDrop={e => { e.preventDefault(); setSurvol(false); void atelier.ajouterFichiers([...e.dataTransfer.files]); }}>
@@ -123,7 +125,7 @@ export function Application() {
           <button type="button" className="primaire" onClick={() => choix.current?.click()}>Choisir des PDF…</button>
         </main>
       ) : (
-        <main className="travail">
+        <main className="travail" inert={atelier.occupe} aria-busy={atelier.occupe}>
           <Grille atelier={atelier} ouvrir={setApercu} />
           <p className="aide discret-texte">
             Clic, Maj+clic, Ctrl+clic pour choisir ; glisser ou Alt+flèches pour ranger ; double clic ou Entrée pour voir en grand ; Ctrl+molette pour zoomer.
@@ -131,6 +133,7 @@ export function Application() {
           </p>
         </main>
       )}
+      <Attente travail={atelier.travail} />
       {apercu !== null ? <Apercu montage={montage} id={apercu} changer={setApercu} fermer={fermerApercu} /> : null}
       {scission ? <Scinder total={montage.pages.length} nom={nomDeSortie(montage)} fermer={() => setScission(false)}
         enregistrer={r => { setScission(false); void atelier.enregistrerScission(r); }} /> : null}

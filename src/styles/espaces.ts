@@ -35,7 +35,8 @@ export const COUCHES: readonly Mesure[] = [
   { id: 'couche-glisser', valeur: '5', description: 'Le repère d’insertion pendant qu’on glisse des pages dans la grille' },
   { id: 'couche-barre', valeur: '10', description: 'La barre d’outils, collée en haut quand la grille défile' },
   { id: 'couche-apercu', valeur: '1000', description: 'L’aperçu d’une page en grand, au-dessus de la grille' },
-  { id: 'couche-dialogue', valeur: '1200', description: 'Le voile et la boîte de scission' }
+  { id: 'couche-dialogue', valeur: '1200', description: 'Le voile et la boîte de scission' },
+  { id: 'couche-attente', valeur: '1300', description: 'La roue d’attente au milieu de l’écran, au-dessus de tout pendant un travail' }
 ];
 
 const TOUTES = [...ESPACES, ...RAYONS, ...COUCHES];

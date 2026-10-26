@@ -96,3 +96,16 @@ input[type="radio"] { accent-color: var(--cyan); }
 .choix-format { display: grid; grid-template-columns: auto 1fr; gap: var(--esp-s); align-items: start; }
 .choix-format input { margin-top: var(--esp-xs); }
 .boite p { margin: 0; font-size: var(--texte-compact); }
+
+/* La roue d'attente : au milieu de l'ecran, sur un voile, pendant un travail long. La roue tourne ; avec
+   prefers-reduced-motion, elle reste immobile et seul le texte (la page en cours) avance. */
+.attente { position: fixed; inset: 0; z-index: var(--couche-attente); display: flex; align-items: center; justify-content: center;
+  background: var(--voile); padding: var(--esp-xl); }
+.attente-carte { display: grid; justify-items: center; gap: var(--esp-l); padding: var(--esp-2xl) var(--esp-2xl); min-width: min(280px, 100%);
+  background: var(--panneau); border-radius: var(--rayon-carte); box-shadow: 0 8px 32px var(--ombre); }
+.roue { width: 48px; height: 48px; border-radius: 50%; border: 5px solid var(--filet); border-top-color: var(--cyan); }
+.attente-texte { margin: 0; text-align: center; font-size: var(--texte-corps); font-variant-numeric: tabular-nums; max-width: 46ch; text-wrap: balance; }
+@media (prefers-reduced-motion: no-preference) {
+  .roue { animation: tourner 0.9s linear infinite; }
+}
+@keyframes tourner { to { transform: rotate(360deg); } }

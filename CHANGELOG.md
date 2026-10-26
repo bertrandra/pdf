@@ -5,7 +5,16 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 
 ## [Non publié]
 
+### Corrigé
+
+- La page se charge chez un hébergeur qui ne donne pas de type aux fichiers `.mjs` (SiteGround) : pdf.js est livré en
+  `.js`, et la construction refuse tout fichier `.mjs` dans `dist/`. Une source que pdf.js n'a pas pu ouvrir est
+  rouverte au besoin, et c'est la vraie raison qui s'affiche, plus « Source inconnue ».
+
 ### Ajouté
+
+- Une roue d’attente au milieu de l’écran pendant un travail long (lecture, écriture, conversion, OCR) : elle dit
+  ce qui se fait, page par page, et la page ne se modifie pas pendant ce temps. Immobile avec « réduire les animations ».
 
 - La page se publie comme artefact claude.ai (`npm run artefact`) : l’enregistrement passe alors par l’hôte, qui
   demande confirmation, et « Enregistrement annulé. » le dit si la personne refuse.
