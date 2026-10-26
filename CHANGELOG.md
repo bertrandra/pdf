@@ -7,6 +7,9 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 
 ### Ajouté
 
+- La page se publie comme artefact claude.ai (`npm run artefact`) : l’enregistrement passe alors par l’hôte, qui
+  demande confirmation, et « Enregistrement annulé. » le dit si la personne refuse.
+
 - La page : ajouter des PDF (bouton ou dépôt), les fusionner, ranger les pages (glisser, Alt+flèches), les tourner,
   inverser, supprimer, découper (ne garder que la sélection), extraire, et scinder en plusieurs fichiers (toutes les
   *n* pages, avant certaines pages, ou en parties écrites), livrés dans une archive ZIP.
@@ -19,6 +22,7 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 - Le texte converti reste modifiable : en PowerPoint et en Word mise en page conservée, chaque ligne devient une
   zone de texte à sa place, avec sa police, sa taille, son gras, son italique et sa couleur, sur le fond de la page
   dessiné sans son texte.
+- Les modèles OCR sont servis compressés (gzip) : un cinquième de moins à charger.
 - La reconnaissance de caractères (OCR) des pages scannées, dans les trois conversions : Tesseract avec les modèles
   `tessdata_best` les plus justes (français, anglais), sans rien envoyer ; le texte reconnu est effacé du scan et posé
   à sa place, modifiable, les colonnes d'un tableau gardées.

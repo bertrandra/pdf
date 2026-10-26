@@ -5,10 +5,15 @@
 // la construction suivante ne touche plus au reseau. Un fichier qui ne correspond pas fait echouer la construction,
 // jamais une page qui reconnaitrait autre chose que ce qui a ete mesure.
 //
-//   node scripts/modeles-ocr.mjs   -> dist/ocr/langues/{fra,eng}.traineddata
+// Les modeles partent compresses (gzip, que tesseract.js decompresse) : un tiers de moins a charger, et le modele
+// anglais (15,4 Mo) passe sous les 15 Mo par fichier d'un artefact. La compression est reproductible : zlib ecrit
+// une date nulle dans l'en-tete gzip, donc les memes modeles rendent les memes octets.
+//
+//   node scripts/modeles-ocr.mjs   -> dist/ocr/langues/{fra,eng}.traineddata.gz
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { constants, gzipSync } from 'node:zlib';
 import { annoncer, depuisRacine, enKo, estLance } from './aide.mjs';
 
 const registre = JSON.parse(readFileSync(depuisRacine('data/modeles-ocr.json'), 'utf8'));
@@ -33,16 +38,17 @@ async function modele(m) {
   return octets;
 }
 
-/** Ecrit les modeles dans dist/ocr/langues/. */
+/** Ecrit les modeles, compresses, dans dist/ocr/langues/. */
 export async function copierModeles() {
   mkdirSync(depuisRacine('dist/ocr/langues'), { recursive: true });
   let total = 0;
   for (const m of registre.modeles) {
     const octets = await modele(m);
-    writeFileSync(depuisRacine('dist/ocr/langues', m.langue + '.traineddata'), octets);
-    total += octets.length;
+    const compresse = gzipSync(octets, { level: constants.Z_BEST_COMPRESSION });
+    writeFileSync(depuisRacine('dist/ocr/langues', m.langue + '.traineddata.gz'), compresse);
+    total += compresse.length;
   }
-  annoncer('Modèles OCR vérifiés', 'ocr/langues/', registre.modeles.map(m => m.langue).join(', ') + ', tessdata_best ' + registre.etiquette + ', ' + enKo(total) + ' Ko');
+  annoncer('Modèles OCR vérifiés', 'ocr/langues/', registre.modeles.map(m => m.langue).join(', ') + ', tessdata_best ' + registre.etiquette + ', ' + enKo(total) + ' Ko compressés');
 }
 
 if (estLance(import.meta.url)) await copierModeles();

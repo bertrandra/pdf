@@ -26,6 +26,9 @@ npm run construire   # dist/pdf.html, dist/pdfjs/
 npm run servir       # http://localhost:5299/pdf.html
 ```
 
+Pour la publier comme artefact claude.ai : `npm run artefact` écrit `dist/artefact/index.html`, à publier avec
+`dist/pdfjs/` et `dist/ocr/` aux mêmes chemins ; l’hôte y demande confirmation avant chaque enregistrement.
+
 La page demande un serveur (même local) : pdf.js, qui dessine les aperçus, se charge en module, ce que les
 navigateurs refusent depuis `file://`.
 

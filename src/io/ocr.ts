@@ -57,7 +57,7 @@ export interface Reconnaisseur {
   fermer(): Promise<void>;
 }
 
-/** Demarre Tesseract (le premier appel charge environ 25 Mo : le coeur et les deux modeles). */
+/** Demarre Tesseract (le premier appel charge environ 20 Mo : le coeur et les deux modeles compresses). */
 export async function ouvrirReconnaisseur(): Promise<Reconnaisseur> {
   const base = new URL(DOSSIER_OCR, document.baseURI).href;
   const t = await tesseract(base);
@@ -66,7 +66,8 @@ export async function ouvrirReconnaisseur(): Promise<Reconnaisseur> {
     workerPath: base + 'worker.min.js',
     corePath: base + 'tesseract-core-lstm.wasm.js',
     langPath: base + 'langues',
-    gzip: false,
+    // Les modeles sont servis compresses (scripts/modeles-ocr.mjs) : tesseract.js les decompresse.
+    gzip: true,
     cacheMethod: 'none',
     workerBlobURL: false
   });

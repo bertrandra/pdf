@@ -22,6 +22,9 @@ export type Message = { readonly type: 'info' | 'alerte' | 'echec'; readonly tex
 /** Le nom du fichier enregistre : celui du premier PDF ouvert, ou « document.pdf ». */
 export const nomDeSortie = (m: Montage): string => (m.sources[0]?.nom.replace(/\.pdf$/i, '') || 'document') + '.pdf';
 
+/** Le message quand la personne a refuse l'enregistrement que l'hote lui proposait : un choix, pas un echec. */
+const ANNULE: Message = { type: 'info', texte: 'Enregistrement annulé.' };
+
 const raison = (e: unknown): string => (e instanceof Error ? e.message : 'Erreur inattendue.');
 
 const pluriel = (n: number, mot: string): string => n + ' ' + mot + (n > 1 ? 's' : '');
@@ -88,8 +91,8 @@ export function useAtelier() {
   const enregistrer = useCallback(async (m: Montage, nom: string) => {
     setOccupe(true);
     try {
-      telecharger(await assembler(m, octets.current), nom, 'application/pdf');
-      setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
+      const remise = await telecharger(await assembler(m, octets.current), nom, 'application/pdf');
+      setMessage(remise === 'refuse' ? ANNULE : { type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
     } catch (e) {
       setMessage({ type: 'echec', texte: raison(e) });
     } finally {
@@ -107,9 +110,11 @@ export function useAtelier() {
       const fichiers = [];
       for (const [k, p] of parties.entries()) fichiers.push({ nom: noms[k] ?? 'partie.pdf', donnees: await assembler(p, octets.current) });
       const seul = fichiers[0];
-      if (fichiers.length === 1 && seul !== undefined) telecharger(seul.donnees, seul.nom, 'application/pdf');
-      else telecharger(ecrireZip(fichiers), base.replace(/\.pdf$/i, '') + '.zip', 'application/zip');
-      setMessage({ type: 'info', texte: pluriel(fichiers.length, 'fichier') + ' enregistré' + (fichiers.length > 1 ? 's' : '') + '.' });
+      const remise = fichiers.length === 1 && seul !== undefined
+        ? await telecharger(seul.donnees, seul.nom, 'application/pdf')
+        : await telecharger(ecrireZip(fichiers), base.replace(/\.pdf$/i, '') + '.zip', 'application/zip');
+      if (remise === 'refuse') setMessage(ANNULE);
+      else setMessage({ type: 'info', texte: pluriel(fichiers.length, 'fichier') + ' enregistré' + (fichiers.length > 1 ? 's' : '') + '.' });
     } catch (e) {
       setMessage({ type: 'echec', texte: raison(e) });
     } finally {
@@ -129,8 +134,9 @@ export function useAtelier() {
       const octetsConvertis = await convertir(m, format, ocr, (fait, total, reconnaissance) => {
         setMessage({ type: 'info', texte: (reconnaissance ? 'Reconnaissance du texte (OCR) : page ' : 'Conversion : page ') + fait + ' sur ' + total + '…' });
       });
-      telecharger(octetsConvertis, nom, TYPES_MIME[format]);
-      setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
+      const remise = await telecharger(octetsConvertis, nom, TYPES_MIME[format]);
+      if (remise === 'refuse') setMessage(ANNULE);
+      else setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
     } catch (e) {
       setMessage({ type: 'echec', texte: 'La conversion a échoué : ' + raison(e) });
     } finally {

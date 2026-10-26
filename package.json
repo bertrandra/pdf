@@ -4,7 +4,7 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "pdf : fusionner, decouper et scinder des PDF dans le navigateur, avec une grille de vignettes zoomable.",
+  "description": "pdf : fusionner, decouper, scinder des PDF et les convertir en PowerPoint ou en Word, avec OCR, dans le navigateur.",
   "keywords": [
     "pdf",
     "merge",
@@ -27,7 +27,8 @@
     "cliquet": "node scripts/cliquet.mjs",
     "verifier": "npm run typecheck && npm run lint && npm run cliquet && npm test",
     "construire": "node scripts/construire.mjs",
-    "servir": "node scripts/servir.mjs"
+    "servir": "node scripts/servir.mjs",
+    "artefact": "node scripts/construire.mjs && node scripts/artefact.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
