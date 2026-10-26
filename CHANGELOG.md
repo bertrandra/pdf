@@ -19,6 +19,9 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 - Le texte converti reste modifiable : en PowerPoint et en Word mise en page conservée, chaque ligne devient une
   zone de texte à sa place, avec sa police, sa taille, son gras, son italique et sa couleur, sur le fond de la page
   dessiné sans son texte.
+- La reconnaissance de caractères (OCR) des pages scannées, dans les trois conversions : Tesseract avec les modèles
+  `tessdata_best` les plus justes (français, anglais), sans rien envoyer ; le texte reconnu est effacé du scan et posé
+  à sa place, modifiable, les colonnes d'un tableau gardées.
 - Le choix de pages par plages écrites (`1-3, 7, 10-`).
 - L'écriture reproductible par pdf-lib : mêmes sources et même montage, mêmes octets.
 - Les jetons de couleur, de texte et d'espacement, repris de `svg`, avec leurs contrastes vérifiés dans les deux thèmes.

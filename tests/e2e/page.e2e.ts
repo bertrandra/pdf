@@ -6,6 +6,7 @@ import { chromium, firefox, webkit, type Browser, type Page } from 'playwright';
 import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { join } from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 import { a4, pagesDe, pdfTemoin } from '../aide/pdfs.js';
 import { lireZip, texte } from '../aide/zip.js';
 
@@ -151,6 +152,47 @@ describe('la page', () => {
     expect(erreurs).toEqual([]);
     await page.close();
   });
+
+  it('reconnait le texte d un scan (OCR) et le rend modifiable, sans rien demander au reseau', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    const exterieur: string[] = [];
+    page.on('request', r => { if (!/^(http:\/\/127\.0\.0\.1:\d+\/|blob:|data:)/.test(r.url())) exterieur.push(r.url()); });
+    // Un scan : du texte dessine dans une image a 300 dpi, legerement penche, enregistre en JPEG, seul dans un PDF.
+    const jpeg = await page.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 2480; c.height = 700;
+      const x = c.getContext('2d');
+      if (x === null) return [];
+      x.fillStyle = 'white'; x.fillRect(0, 0, c.width, c.height);
+      x.rotate(0.6 * Math.PI / 180);
+      x.fillStyle = 'black'; x.font = '46px serif';
+      ['Le conseil municipal s’est réuni le 14 février.', 'Total TTC : 233,88 € pour 12 ramettes.'].forEach((l, i) => x.fillText(l, 180, 220 + i * 92));
+      const b: Blob | null = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.8));
+      return b ? Array.from(new Uint8Array(await b.arrayBuffer())) : [];
+    });
+    const doc = await PDFDocument.create({ updateMetadata: false });
+    const image = await doc.embedJpg(new Uint8Array(jpeg));
+    doc.addPage([595.28, 168]).drawImage(image, { x: 0, y: 0, width: 595.28, height: 168 });
+    await deposer(page, [{ name: 'scan.pdf', octets: await doc.save() }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(1);
+    for (const [format, nom] of [['PowerPoint (.pptx)', 'scan.pptx'], ['Word, texte au fil (.docx)', 'scan.docx']] as const) {
+      await page.getByRole('button', { name: 'Convertir…' }).click();
+      const boite = page.getByRole('dialog');
+      await boite.getByRole('radio', { name: format }).check();
+      await expect.poll(() => boite.getByRole('checkbox', { name: /Reconnaître le texte/ }).isChecked()).toBe(true);
+      const telechargement = page.waitForEvent('download', { timeout: 120_000 });
+      await boite.getByRole('button', { name: 'Convertir la page' }).click();
+      const fichier = await telechargement;
+      expect(fichier.suggestedFilename()).toBe(nom);
+      const archive = lireZip(new Uint8Array(readFileSync(await fichier.path())));
+      const tout = [...archive.keys()].filter(n => n.endsWith('.xml')).map(n => texte(archive, n)).join('');
+      expect(tout, format).toContain('conseil municipal');
+      expect(tout, format).toContain('233,88');
+      expect(tout, format).toContain('février');
+    }
+    expect(exterieur).toEqual([]);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  }, 240_000);
 
   it('n a aucune violation d accessibilite grave', async () => {
     const { page } = await ouvrirPage();

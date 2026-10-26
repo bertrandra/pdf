@@ -11,10 +11,11 @@ const CHOIX: ReadonlyArray<{ format: FormatConversion; titre: string; detail: st
 ];
 
 export function Convertir({ total, choisies, convertir, fermer }: {
-  total: number; choisies: number; convertir: (format: FormatConversion, seulementChoisies: boolean) => void; fermer: () => void;
+  total: number; choisies: number; convertir: (format: FormatConversion, seulementChoisies: boolean, ocr: boolean) => void; fermer: () => void;
 }) {
   const [format, setFormat] = useState<FormatConversion>('pptx');
   const [seulementChoisies, setSeulementChoisies] = useState(false);
+  const [ocr, setOcr] = useState(true);
   const premier = useRef<HTMLInputElement>(null);
   useEffect(() => { premier.current?.focus(); }, []);
   const n = seulementChoisies ? choisies : total;
@@ -22,7 +23,7 @@ export function Convertir({ total, choisies, convertir, fermer }: {
   return (
     <div className="voile" onKeyDown={e => { if (e.key === 'Escape') fermer(); }}>
       <form className="boite" role="dialog" aria-modal="true" aria-labelledby="titre-conversion"
-        onSubmit={e => { e.preventDefault(); convertir(format, seulementChoisies); }}>
+        onSubmit={e => { e.preventDefault(); convertir(format, seulementChoisies, ocr); }}>
         <h2 id="titre-conversion">Convertir en PowerPoint ou en Word</h2>
         <fieldset>
           <legend className="discret-texte">Format</legend>
@@ -40,8 +41,13 @@ export function Convertir({ total, choisies, convertir, fermer }: {
             <label><input type="radio" name="pages-conversion" checked={seulementChoisies} onChange={() => setSeulementChoisies(true)} /> Les pages choisies ({choisies})</label>
           </fieldset>
         ) : null}
-        <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.
-          Une page scannée n’a pas de texte : elle reste une image.</p>
+        <label className="choix-format">
+          <input type="checkbox" checked={ocr} onChange={e => setOcr(e.target.checked)} aria-describedby="aide-ocr" />
+          <span><strong>Reconnaître le texte des pages scannées (OCR)</strong><br />
+            <span id="aide-ocr" className="discret-texte">Une page scannée devient du texte modifiable, en français et en anglais, avec le modèle le plus précis.
+              Comptez quelques secondes par page scannée ; sans cela, elle reste une image.</span></span>
+        </label>
+        <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.</p>
         <p className="discret-texte">La conversion se fait dans cette page : rien n’est envoyé. Comptez quelques secondes par dizaine de pages.</p>
         <div className="actions">
           <button type="button" onClick={fermer}>Annuler</button>

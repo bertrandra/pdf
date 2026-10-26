@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { depuisRacine, estLance } from './aide.mjs';
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.js': 'text/javascript', '.pdf': 'application/pdf' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.js': 'text/javascript', '.pdf': 'application/pdf', '.wasm': 'application/wasm' };
 
 /** Un serveur de dist/ (ou d'un autre dossier) ; rend le serveur, a fermer par l'appelant. */
 export function servir(port = 5299, dossier = depuisRacine('dist')) {

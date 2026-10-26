@@ -1,0 +1,9 @@
+{
+  "source": "https://github.com/tesseract-ocr/tessdata_best",
+  "licence": "Apache-2.0",
+  "etiquette": "4.1.0",
+  "modeles": [
+    { "langue": "fra", "octets": 3972885, "sha256": "907743d98915c91a3906dfbf6e48b97598346698fe53aaa797e1a064ffcac913" },
+    { "langue": "eng", "octets": 15400601, "sha256": "8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba" }
+  ]
+}

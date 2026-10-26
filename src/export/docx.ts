@@ -114,9 +114,10 @@ export function ecrireDocxTexte(pages: readonly PageTexte[]): Uint8Array {
   const premiere = pages[0];
   if (premiere === undefined) throw new RangeError('Aucune page à convertir.');
   // Le premier paragraphe d'une page du PDF ouvre une page Word (pageBreakBefore) : un saut de page dans un
-  // paragraphe a lui laisserait une ligne vide en haut de chaque page.
+  // paragraphe a lui laisserait une ligne vide en haut de chaque page. Une tabulation (les colonnes d'une rangee
+  // reconnue par l'OCR) devient une vraie tabulation Word.
   const paragraphe = (texte: string, nouvellePage: boolean) => '<w:p>' + (nouvellePage ? '<w:pPr><w:pageBreakBefore/></w:pPr>' : '')
-    + (texte === '' ? '' : '<w:r><w:t xml:space="preserve">' + echapper(texte) + '</w:t></w:r>') + '</w:p>';
+    + (texte === '' ? '' : '<w:r>' + texte.split('\t').map(t => '<w:t xml:space="preserve">' + echapper(t) + '</w:t>').join('<w:tab/>') + '</w:r>') + '</w:p>';
   const corps = pages.map((p, i) => (p.paragraphes.length > 0 ? p.paragraphes : ['']).map((t, k) => paragraphe(t, i > 0 && k === 0)).join('')).join('');
   // Une taille de page pour tout le document : celle de la premiere page, avec des marges de 2 cm.
   return paquetWord(corps + section(premiere.largeur, premiere.hauteur, 56.7), []);

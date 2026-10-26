@@ -5,7 +5,12 @@
   "license": "UNLICENSED",
   "type": "module",
   "description": "pdf : fusionner, decouper et scinder des PDF dans le navigateur, avec une grille de vignettes zoomable.",
-  "keywords": ["pdf", "merge", "split", "react"],
+  "keywords": [
+    "pdf",
+    "merge",
+    "split",
+    "react"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bertrandra/pdf.git"
@@ -42,6 +47,7 @@
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "5.4.296",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tesseract.js": "7.0.0"
   }
 }

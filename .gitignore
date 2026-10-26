@@ -9,3 +9,5 @@ test-results/
 # Les worktrees des agents (isolation: worktree) : jamais du code du depot.
 .claude/worktrees/
 .claude/settings.local.json
+# Les modeles OCR telecharges et verifies (scripts/modeles-ocr.mjs) : un cache, pas du code.
+.cache/

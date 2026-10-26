@@ -31,7 +31,12 @@ jobs:
         run: npm run cliquet
       - name: Tests (couches, purete, moteur, ecriture)
         run: npm test
-      - name: Page (le moteur se compile, pdf.js se recopie)
+      # Les modeles OCR (tessdata_best, 19 Mo) se telechargent une fois, verifies par sha256 (scripts/modeles-ocr.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ocr
+          key: modeles-ocr-${{ hashFiles('data/modeles-ocr.json') }}
+      - name: Page (le moteur se compile, pdf.js et l'OCR se recopient)
         run: npm run construire
 
   # La page construite, servie en local et ouverte dans un vrai navigateur (tests/e2e). Chromium est exige ;
@@ -55,6 +60,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Les modeles OCR (tessdata_best, 19 Mo) se telechargent une fois, verifies par sha256 (scripts/modeles-ocr.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ocr
+          key: modeles-ocr-${{ hashFiles('data/modeles-ocr.json') }}
       - name: Construire la page
         run: npm run construire
       - name: ${{ matrix.navigateur }} de Playwright

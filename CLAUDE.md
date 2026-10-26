@@ -16,7 +16,7 @@ Ce que lance la CI (`.github/workflows/ci.yml`, job `verifier`) — tout doit pa
 
 ```bash
 npm run verifier     # typecheck && lint && cliquet && test
-npm run construire   # dist/pdf.html et dist/pdfjs/
+npm run construire   # dist/pdf.html, dist/pdfjs/ et dist/ocr/ (modèles OCR vérifiés, mis en cache)
 npm run e2e          # la page dans un vrai navigateur (après construire)
 ```
 
@@ -26,7 +26,7 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   `engine/styles` → `core/io/render/export/interaction` → `ui` → `app/zones`. Une couche n'importe jamais une
   couche plus haute ; un dossier nouveau se classe dans `NIVEAU` avant d'exister.
 - Le cœur pur (`util`, `model`, `engine`) ne touche ni au DOM, ni à l'horloge, ni au hasard, ni au réseau.
-  pdf-lib vit dans `export` (écrire) et `io` (lire) ; pdf.js seulement dans `io/apercu.ts`.
+  pdf-lib vit dans `export` (écrire) et `io` (lire) ; pdf.js seulement dans `io/apercu.ts`, Tesseract dans `io/ocr.ts`.
 - Pour voir la page : `npm run construire && npm run servir`, puis `http://localhost:5299/pdf.html`. Elle ne
   marche pas depuis `file://` : pdf.js se charge en module.
 
@@ -70,6 +70,11 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   de texte (`operationsFilter`) ; chaque ligne s'y pose en zone de texte (PowerPoint) ou en cadre (Word), avec
   police, taille, gras, italique et couleur (lue en comparant les rendus avec et sans texte), calculés en pur
   (`engine/miseEnPage.ts`). Une ligne par zone, jamais un paragraphe. Jamais de texte en image quand le PDF en a.
+- **L'OCR, la plus juste, sans rien envoyer** (ADR-0007) : Tesseract en WebAssembly (`tesseract.js` épinglé), modèles
+  `tessdata_best` en virgule flottante (fra, eng), cœur sans SIMD, 300 dpi, servis depuis `dist/ocr/` ; les modèles
+  sont épinglés par étiquette et sha256 (`data/modeles-ocr.json`, `scripts/modeles-ocr.mjs`, cache `.cache/ocr/`).
+  Seule une ligne sûre devient du texte et s'efface du scan (`engine/ocr.ts`) ; changer de modèle se mesure d'abord
+  (taux d'erreur par caractère, voir l'ADR). Tesseract ne vit que dans `io/ocr.ts`.
 - **Une couleur d'interface est un jeton** (ADR-0004) : `src/styles/jetons.ts` (couleurs, mêmes valeurs que
   `svg`), `typographie.ts` et `espaces.ts` sont la seule source ; le CSS des variables se génère au build ; la
   feuille `outils/pdf/page.css` n'écrit aucune couleur, taille de texte, rayon ni couche ; chaque texte tient

@@ -121,13 +121,13 @@ export function useAtelier() {
    * Convertit en PowerPoint ou en Word le montage entier, ou seulement les pages choisies. La region vocale annonce
    * l'avancee toutes les dix pages, et la barre d'etat a chaque page.
    */
-  const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean) => {
+  const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean, ocr: boolean) => {
     const m = seulementChoisies ? { ...montage, pages: montage.pages.filter(p => selection.ids.has(p.id)) } : montage;
     const nom = nomDeSortie(montage).replace(/\.pdf$/i, '') + '.' + EXTENSIONS[format];
     setOccupe(true);
     try {
-      const octetsConvertis = await convertir(m, format, (fait, total) => {
-        setMessage({ type: 'info', texte: 'Conversion : page ' + fait + ' sur ' + total + '…' });
+      const octetsConvertis = await convertir(m, format, ocr, (fait, total, reconnaissance) => {
+        setMessage({ type: 'info', texte: (reconnaissance ? 'Reconnaissance du texte (OCR) : page ' : 'Conversion : page ') + fait + ' sur ' + total + '…' });
       });
       telecharger(octetsConvertis, nom, TYPES_MIME[format]);
       setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });

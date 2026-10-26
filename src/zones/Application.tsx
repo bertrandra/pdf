@@ -135,7 +135,7 @@ export function Application() {
       {scission ? <Scinder total={montage.pages.length} nom={nomDeSortie(montage)} fermer={() => setScission(false)}
         enregistrer={r => { setScission(false); void atelier.enregistrerScission(r); }} /> : null}
       {conversion ? <Convertir total={montage.pages.length} choisies={atelier.selection.ids.size} fermer={() => setConversion(false)}
-        convertir={(format, seules) => { setConversion(false); void atelier.convertirEn(format, seules); }} /> : null}
+        convertir={(format, seules, ocr) => { setConversion(false); void atelier.convertirEn(format, seules, ocr); }} /> : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { couleurDuTexte, lignesPosees, lirePolice, type FragmentVu } from '../engine/miseEnPage.js';
+import { boitesOcr, effacerLignes, lignesOcrPosees, type ParagrapheOcr } from '../engine/ocr.js';
 import type { Fragment } from '../engine/texte.js';
 import type { LigneColoree } from '../export/ooxml.js';
 import type { Quart } from '../model/montage.js';
@@ -135,9 +136,9 @@ const OPERATIONS_DE_TEXTE = (m: PdfJs): ReadonlySet<number> =>
 /**
  * Une page prete a convertir en texte modifiable (ADR-0006) : son fond (la page dessinee sans ses operations de
  * texte) et ses lignes posees, chacune avec sa couleur, lue en comparant la page avec et sans texte. Une page sans
- * texte rend son image entiere et aucune ligne.
+ * texte visible est dite scannee : elle rend son image entiere, et l'OCR peut la reprendre (`pageScannee`).
  */
-export async function pageModifiable(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<{ image: Uint8Array; lignes: LigneColoree[] }> {
+export async function pageModifiable(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<{ image: Uint8Array; lignes: LigneColoree[]; scannee: boolean }> {
   return aTonTour(async () => {
     const m = await pdfjs();
     const doc = documents.get(id);
@@ -160,7 +161,7 @@ export async function pageModifiable(id: string, index: number, rotation: Quart,
       return toile;
     };
     const fond = await dessiner(aSauter.size > 0 ? i => !aSauter.has(i) : undefined);
-    if (aSauter.size === 0) return { image: await encoder(fond, format), lignes: [] };
+    if (aSauter.size === 0) return { image: await encoder(fond, format), lignes: [], scannee: true };
 
     const contenu = await page.getTextContent();
     const fragments: FragmentVu[] = contenu.items.flatMap(item => {
@@ -197,6 +198,42 @@ export async function pageModifiable(id: string, index: number, rotation: Quart,
       const boite = { x: Math.min(...xs), y: Math.min(...ys), largeur: Math.max(...xs) - Math.min(...xs), hauteur: Math.max(...ys) - Math.min(...ys) };
       return { ...l, couleur: couleurDuTexte(avec, sans, boite) };
     });
-    return { image: await encoder(fond, format), lignes: colorees };
+    // Un texte entierement invisible est la couche OCR d'un scan : la page est une image, a reconnaitre au besoin.
+    return { image: await encoder(fond, format), lignes: colorees, scannee: colorees.every(l => l.couleur === null) };
   });
+}
+
+/** Une page dessinee a la largeur demandee, pour la reconnaissance de caracteres (le texte au fil d'un scan). */
+export function toileDePage(id: string, index: number, rotation: Quart, largeur: number): Promise<HTMLCanvasElement> {
+  return aTonTour(() => rendre(id, index, rotation, largeur));
+}
+
+/**
+ * Une page scannee rendue modifiable (ADR-0007) : dessinee a `largeurOcr` pixels (300 dpi), reconnue par `reconnaitre`
+ * (io/ocr.ts), ses lignes sures effacees de l'image (couvertes par la couleur du papier, leur encre lue avant), puis
+ * l'image ramenee a `largeurFond` pour servir de fond. `largeurPoints` est la largeur vue de la page, en points.
+ */
+export async function pageScannee(
+  id: string, index: number, rotation: Quart, largeurPoints: number, largeurOcr: number, largeurFond: number, format: 'jpeg' | 'png',
+  reconnaitre: (toile: HTMLCanvasElement) => Promise<ParagrapheOcr[]>
+): Promise<{ image: Uint8Array; lignes: LigneColoree[] }> {
+  const toile = await toileDePage(id, index, rotation, largeurOcr);
+  const paragraphes = await reconnaitre(toile);
+  const lignes = lignesOcrPosees(paragraphes, largeurPoints / toile.width);
+  const boites = boitesOcr(paragraphes);
+  const contexte = toile.getContext('2d', { willReadFrequently: true });
+  let couleurs: (string | null)[] = boites.map(() => null);
+  if (contexte !== null && boites.length > 0) {
+    const image = contexte.getImageData(0, 0, toile.width, toile.height);
+    couleurs = effacerLignes({ donnees: image.data, largeur: toile.width, hauteur: toile.height }, boites);
+    contexte.putImageData(image, 0, 0);
+  }
+  const fond = document.createElement('canvas');
+  fond.width = Math.max(1, Math.round(largeurFond));
+  fond.height = Math.max(1, Math.round(toile.height * largeurFond / toile.width));
+  const c = fond.getContext('2d');
+  if (c !== null) { c.imageSmoothingQuality = 'high'; c.drawImage(toile, 0, 0, fond.width, fond.height); }
+  toile.width = 0;
+  // Une ligne dont l'encre ne se distingue pas du papier reste noire : elle a ete reconnue, elle se lit.
+  return { image: await encoder(fond, format), lignes: lignes.map((l, i) => ({ ...l, couleur: couleurs[i] ?? '000000' })) };
 }

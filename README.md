@@ -12,7 +12,9 @@ sur place, rien ne part sur le réseau.
   plusieurs fichiers partent dans une archive ZIP, nommés `document-1.pdf`, `document-2.pdf`…
 - **Convertir** : en PowerPoint (une diapositive par page) ou en Word (une page Word par page, à la même taille),
   le texte restant modifiable, chaque ligne à sa place avec sa police, sa taille et sa couleur ; ou en Word texte au
-  fil (des paragraphes à réécrire, sans la mise en page). Le document entier ou les pages choisies.
+  fil (des paragraphes à réécrire, sans la mise en page). Le document entier ou les pages choisies. Une page
+  scannée passe par la reconnaissance de caractères (Tesseract, modèles les plus justes, français et anglais), sur
+  l'ordinateur même.
 - **Zoomer** : la grille par paliers (curseur, + et −, Ctrl+molette), l'aperçu d'une page en grand (double clic ou
   Entrée) en pourcentage, page entière ou pleine largeur.
 
@@ -38,7 +40,7 @@ Les mêmes couches que `svg` (`tests/unit/architecture.test.ts` les impose) :
 | `src/engine` | le calcul pur : opérations de montage, plages de pages, sélection, zoom, texte en paragraphes |
 | `src/styles` | les jetons de l'interface |
 | `src/export` | l'écriture : PDF (pdf-lib), PowerPoint et Word (à la main), ZIP |
-| `src/io` | la lecture des fichiers, les aperçus (pdf.js), les téléchargements |
+| `src/io` | la lecture des fichiers, les aperçus (pdf.js), l'OCR (Tesseract), les téléchargements |
 | `src/zones` | les composants React |
 
 Les décisions sont dans `docs/adr/`, les consignes de travail dans `CLAUDE.md`.

@@ -2,10 +2,14 @@
 // demande au premier apercu (src/io/apercu.ts). pdf.js est recopie tel que le paquet epingle le livre, jamais
 // recompile : sa version est celle de package-lock.json.
 //
-//   npm run construire   -> dist/pdf.html, dist/pdfjs/pdf.min.mjs, dist/pdfjs/pdf.worker.min.mjs
+// L'OCR suit la meme regle (ADR-0007) : tesseract.js, son travailleur et son coeur sans SIMD sont recopies dans
+// dist/ocr/, les modeles verifies par scripts/modeles-ocr.mjs.
+//
+//   npm run construire   -> dist/pdf.html, dist/pdfjs/pdf.min.mjs, dist/pdfjs/pdf.worker.min.mjs, dist/ocr/
 
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { annoncer, depuisRacine, ecrireDansDist, empaqueter, enKo, refuserFinDeScript } from './aide.mjs';
+import { copierModeles } from './modeles-ocr.mjs';
 
 /** Les reperes que page.html doit porter, dans l'ordre ou ils sont remplaces. */
 export const REPERES_PAGE = ['/*JETONS*/', '/*STYLE*/', '/*MOTEUR*/'];
@@ -42,3 +46,14 @@ mkdirSync(depuisRacine('dist/pdfjs'), { recursive: true });
 for (const f of ['pdf.min.mjs', 'pdf.worker.min.mjs']) copyFileSync(depuisRacine('node_modules/pdfjs-dist/build', f), depuisRacine('dist/pdfjs', f));
 const version = JSON.parse(readFileSync(depuisRacine('node_modules/pdfjs-dist/package.json'), 'utf8')).version;
 annoncer('pdf.js recopié', 'pdfjs/', 'version ' + version);
+
+// Le coeur sans SIMD : les modeles en virgule flottante n'ont pas de produit scalaire dans les coeurs SIMD (io/ocr.ts).
+const tesseract = depuisRacine('node_modules/tesseract.js');
+const coeur = depuisRacine('node_modules/tesseract.js/node_modules/tesseract.js-core');
+mkdirSync(depuisRacine('dist/ocr'), { recursive: true });
+for (const [dossier, f] of [[tesseract + '/dist', 'tesseract.min.js'], [tesseract + '/dist', 'worker.min.js'], [coeur, 'tesseract-core-lstm.wasm.js']]) {
+  copyFileSync(dossier + '/' + f, depuisRacine('dist/ocr', f));
+}
+const versionOcr = JSON.parse(readFileSync(tesseract + '/package.json', 'utf8')).version;
+annoncer('tesseract.js recopié', 'ocr/', 'version ' + versionOcr);
+await copierModeles();
