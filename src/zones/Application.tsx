@@ -9,6 +9,7 @@ import { largeurVignette, palierVoisin, PALIERS_VIGNETTE } from '../engine/zoom.
 import { useAtelier, nomDeSortie, type Atelier } from './atelier.js';
 import { Apercu } from './Apercu.js';
 import { Grille } from './Grille.js';
+import { Convertir } from './Convertir.js';
 import { Scinder } from './Scinder.js';
 
 function ChoisirPages({ atelier }: { atelier: Atelier }) {
@@ -44,7 +45,7 @@ function Zoom({ atelier }: { atelier: Atelier }) {
   );
 }
 
-function Barre({ atelier, ajouter, scinder }: { atelier: Atelier; ajouter: () => void; scinder: () => void }) {
+function Barre({ atelier, ajouter, scinder, convertir }: { atelier: Atelier; ajouter: () => void; scinder: () => void; convertir: () => void }) {
   const { montage, selection, occupe } = atelier;
   const vide = montage.pages.length === 0, aucune = selection.ids.size === 0;
   const n = selection.ids.size;
@@ -68,6 +69,7 @@ function Barre({ atelier, ajouter, scinder }: { atelier: Atelier; ajouter: () =>
       {vide ? null : <Zoom atelier={atelier} />}
       <div className="groupe">
         <button type="button" disabled={vide || occupe} onClick={scinder}>Scinder…</button>
+        <button type="button" disabled={vide || occupe} onClick={convertir} title="En PowerPoint ou en Word">Convertir…</button>
         <button type="button" className="primaire" disabled={vide || occupe} onClick={() => void atelier.enregistrer(montage, nomDeSortie(montage))}>Enregistrer le PDF</button>
       </div>
     </header>
@@ -80,6 +82,7 @@ export function Application() {
   const choix = useRef<HTMLInputElement>(null);
   const [apercu, setApercu] = useState<string | null>(null);
   const [scission, setScission] = useState(false);
+  const [conversion, setConversion] = useState(false);
   const [survol, setSurvol] = useState(false);
 
   // Ctrl+Z et Ctrl+Maj+Z (ou Ctrl+Y) partout, sauf dans un champ ou ils defont la saisie.
@@ -104,7 +107,7 @@ export function Application() {
     <div className="application">
       <input ref={choix} type="file" accept="application/pdf,.pdf" multiple hidden
         onChange={e => { const f = [...(e.target.files ?? [])]; e.target.value = ''; void atelier.ajouterFichiers(f); }} />
-      <Barre atelier={atelier} ajouter={() => choix.current?.click()} scinder={() => setScission(true)} />
+      <Barre atelier={atelier} ajouter={() => choix.current?.click()} scinder={() => setScission(true)} convertir={() => setConversion(true)} />
       <p className="etat" role="status" aria-live="polite">
         {message ? <span className={'message ' + message.type}>{message.texte}</span> : null}
         {atelier.occupe ? <span className="discret-texte"> Un instant…</span> : null}
@@ -131,6 +134,8 @@ export function Application() {
       {apercu !== null ? <Apercu montage={montage} id={apercu} changer={setApercu} fermer={fermerApercu} /> : null}
       {scission ? <Scinder total={montage.pages.length} nom={nomDeSortie(montage)} fermer={() => setScission(false)}
         enregistrer={r => { setScission(false); void atelier.enregistrerScission(r); }} /> : null}
+      {conversion ? <Convertir total={montage.pages.length} choisies={atelier.selection.ids.size} fermer={() => setConversion(false)}
+        convertir={(format, seules) => { setConversion(false); void atelier.convertirEn(format, seules); }} /> : null}
     </div>
   );
 }

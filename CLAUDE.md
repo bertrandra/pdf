@@ -5,8 +5,8 @@ l'architecture de `svg` (mêmes couches, mêmes conventions, mêmes garde-fous).
 
 ## Le projet en une phrase
 
-Une page autonome pour fusionner, découper et scinder des PDF, avec une grille de vignettes zoomable et un
-aperçu en grand. **Un PDF écrit aujourd'hui doit l'être à l'identique demain** : mêmes sources et même montage,
+Une page autonome pour fusionner, découper, scinder des PDF et les convertir en PowerPoint ou en Word, avec une
+grille de vignettes zoomable et un aperçu en grand. **Un PDF écrit aujourd'hui doit l'être à l'identique demain** : mêmes sources et même montage,
 mêmes octets. Un changement qui déplace un octet écrit est un événement de version majeure, jamais une
 correction discrète.
 
@@ -62,6 +62,10 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   (`PALIERS_VIGNETTE`), l'aperçu en pourcentage avec « Page entière », « Pleine largeur » et « 100 % ». Le calcul
   est pur (`engine/zoom.ts`) ; un dessin ne se refait qu'en franchissant un palier de rendu (`largeurDeRendu`).
   Ctrl+molette zoome sans zoomer la page, et l'aperçu garde sous le pointeur le point visé.
+- **Convertir, c'est choisir ce qu'on perd** (ADR-0005) : PowerPoint = une diapositive par page en image ; Word
+  fidèle = une page Word par page, l'image ancrée derrière, une section par page ; Word texte = des paragraphes
+  recollés par `engine/texte.ts`, sans mise en page. Les fichiers s'écrivent à la main (`export/ooxml.ts`,
+  `pptx.ts`, `docx.ts`), sans dépendance, sans date ni auteur ; la boîte dit ce que chaque choix perd.
 - **Une couleur d'interface est un jeton** (ADR-0004) : `src/styles/jetons.ts` (couleurs, mêmes valeurs que
   `svg`), `typographie.ts` et `espaces.ts` sont la seule source ; le CSS des variables se génère au build ; la
   feuille `outils/pdf/page.css` n'écrit aucune couleur, taille de texte, rayon ni couche ; chaque texte tient

@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { join } from 'node:path';
 import { a4, pagesDe, pdfTemoin } from '../aide/pdfs.js';
+import { lireZip, texte } from '../aide/zip.js';
 
 const MOTEURS = { chromium, firefox, webkit };
 const moteur = MOTEURS[(process.env.NAVIGATEUR ?? 'chromium') as keyof typeof MOTEURS] ?? chromium;
@@ -110,6 +111,42 @@ describe('la page', () => {
     const zip = readFileSync(await fichier.path());
     expect(zip.subarray(0, 4).toString('latin1')).toBe('PK\u0003\u0004');
     expect(zip.toString('latin1')).toContain('livre-3.pdf');
+    expect(erreurs).toEqual([]);
+    await page.close();
+  });
+
+  it('convertit en PowerPoint et en Word, dans des fichiers que le navigateur lit', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    await deposer(page, [{ name: 'note.pdf', octets: await pdfTemoin('Bonjour', [{ largeur: 595, hauteur: 842 }, { largeur: 842, hauteur: 595 }]) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(2);
+    const formats = [
+      ['PowerPoint (.pptx)', 'note.pptx', 'ppt/media/image2.jpeg'],
+      ['Word, mise en page fidèle (.docx)', 'note.docx', 'word/media/page-2.jpeg'],
+      ['Word, texte modifiable (.docx)', 'note.docx', 'word/document.xml']
+    ] as const;
+    for (const [format, nom, partie] of formats) {
+      await page.getByRole('button', { name: 'Convertir…' }).click();
+      const boite = page.getByRole('dialog');
+      await boite.getByRole('radio', { name: format }).check();
+      const telechargement = page.waitForEvent('download');
+      await boite.getByRole('button', { name: 'Convertir les 2 pages' }).click();
+      const fichier = await telechargement;
+      expect(fichier.suggestedFilename()).toBe(nom);
+      const archive = lireZip(new Uint8Array(readFileSync(await fichier.path())));
+      expect(archive.has(partie), format).toBe(true);
+      // Chaque partie XML se lit sans erreur par le lecteur XML du navigateur.
+      const xml = [...archive.keys()].filter(n => /\.(xml|rels)$/.test(n)).map(n => texte(archive, n));
+      expect(await page.evaluate(parties => parties.filter(x => new DOMParser().parseFromString(x, 'application/xml').querySelector('parsererror') !== null).length, xml)).toBe(0);
+      if (partie.endsWith('.jpeg')) {
+        // Une vraie image JPEG de la page, a 150 dpi.
+        const jpeg = archive.get(partie) ?? new Uint8Array();
+        expect([jpeg[0], jpeg[1]]).toEqual([0xff, 0xd8]);
+      } else {
+        expect(texte(archive, partie)).toContain('Bonjour 1');
+        expect(texte(archive, partie)).toContain('Bonjour 2');
+      }
+      await expect.poll(() => page.locator('[role=status]').textContent()).toContain('« ' + nom + ' » enregistré');
+    }
     expect(erreurs).toEqual([]);
     await page.close();
   });

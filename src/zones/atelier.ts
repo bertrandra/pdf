@@ -12,6 +12,7 @@ import { assembler } from '../export/assemblage.js';
 import { ecrireZip } from '../export/zip.js';
 import { declarerSource, oublierSource } from '../io/apercu.js';
 import { fichierPdf, lirePdf } from '../io/lecture.js';
+import { convertir, EXTENSIONS, TYPES_MIME, type FormatConversion } from '../io/conversion.js';
 import { lireFichier, telecharger } from '../io/fichiers.js';
 import { MONTAGE_VIDE, type Montage } from '../model/montage.js';
 import { annuler as annulerH, avancer, historique, retablir as retablirH, type Historique } from '../util/historique.js';
@@ -116,6 +117,27 @@ export function useAtelier() {
     }
   }, [montage]);
 
+  /**
+   * Convertit en PowerPoint ou en Word le montage entier, ou seulement les pages choisies. La region vocale annonce
+   * l'avancee toutes les dix pages, et la barre d'etat a chaque page.
+   */
+  const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean) => {
+    const m = seulementChoisies ? { ...montage, pages: montage.pages.filter(p => selection.ids.has(p.id)) } : montage;
+    const nom = nomDeSortie(montage).replace(/\.pdf$/i, '') + '.' + EXTENSIONS[format];
+    setOccupe(true);
+    try {
+      const octetsConvertis = await convertir(m, format, (fait, total) => {
+        setMessage({ type: 'info', texte: 'Conversion : page ' + fait + ' sur ' + total + '…' });
+      });
+      telecharger(octetsConvertis, nom, TYPES_MIME[format]);
+      setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
+    } catch (e) {
+      setMessage({ type: 'echec', texte: 'La conversion a échoué : ' + raison(e) });
+    } finally {
+      setOccupe(false);
+    }
+  }, [montage, selection]);
+
   // Les octets d'une source que plus aucun etat de l'historique ne monte peuvent partir, et ses dessins avec.
   useEffect(() => {
     const utiles = new Set([h.present, ...h.passe, ...h.futur].flatMap(m => m.sources.map(s => s.id)));
@@ -127,7 +149,7 @@ export function useAtelier() {
   return {
     montage, peutAnnuler: h.passe.length > 0, peutRetablir: h.futur.length > 0,
     selection, setSelection, palier, setPalier, message, setMessage, occupe,
-    ajouterFichiers, enregistrer, enregistrerScission, ...verbes
+    ajouterFichiers, enregistrer, enregistrerScission, convertirEn, ...verbes
   };
 }
 

@@ -91,3 +91,8 @@ input[type="radio"] { accent-color: var(--cyan); }
 
 @media (prefers-reduced-motion: no-preference) { button, .vignette, .depot { transition: background 0.12s, border-color 0.12s; } }
 @media (max-width: 640px) { .barre, .travail { padding-left: var(--esp-l); padding-right: var(--esp-l); } .apercu { margin: 0; border-radius: 0; } }
+
+/* La boite de conversion : chaque format avec ce qu'il garde et ce qu'il perd. */
+.choix-format { display: grid; grid-template-columns: auto 1fr; gap: var(--esp-s); align-items: start; }
+.choix-format input { margin-top: var(--esp-xs); }
+.boite p { margin: 0; font-size: var(--texte-compact); }
