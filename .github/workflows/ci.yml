@@ -1,0 +1,73 @@
+# Integration continue : ce qu'un contributeur lance avant de pousser, lance pour lui.
+# Chaque etape est une commande de package.json. Seul le job `navigateur` demande le reseau, pour
+# telecharger le navigateur de Playwright.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Cliquet de rigueur
+        run: npm run cliquet
+      - name: Tests (couches, purete, moteur, ecriture)
+        run: npm test
+      # Les modeles OCR (tessdata_best, 19 Mo) se telechargent une fois, verifies par sha256 (scripts/modeles-ocr.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ocr
+          key: modeles-ocr-${{ hashFiles('data/modeles-ocr.json') }}
+      - name: Page (le moteur se compile, pdf.js et l'OCR se recopient)
+        run: npm run construire
+
+  # La page construite, servie en local et ouverte dans un vrai navigateur (tests/e2e). Chromium est exige ;
+  # Firefox et WebKit tournent sans bloquer jusqu'a leurs premiers passages verts.
+  # TODO : retirer `continue-on-error` pour firefox et webkit des que leurs premiers passages sont verts.
+  navigateur:
+    name: navigateur (${{ matrix.navigateur }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: ${{ matrix.navigateur != 'chromium' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        navigateur: [chromium, firefox, webkit]
+    env:
+      NAVIGATEUR: ${{ matrix.navigateur }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Les modeles OCR (tessdata_best, 19 Mo) se telechargent une fois, verifies par sha256 (scripts/modeles-ocr.mjs).
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ocr
+          key: modeles-ocr-${{ hashFiles('data/modeles-ocr.json') }}
+      - name: Construire la page
+        run: npm run construire
+      - name: ${{ matrix.navigateur }} de Playwright
+        run: npx playwright install --with-deps ${{ matrix.navigateur }}
+      - name: Tests de navigateur (${{ matrix.navigateur }})
+        run: npm run e2e
