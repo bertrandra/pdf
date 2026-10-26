@@ -4,15 +4,16 @@
 // rend le montage recu, a l'identique (l'historique n'empile alors rien).
 
 import { au } from '../util/tableaux.js';
-import type { Montage, PageMontee, PageSource, Quart, Source } from '../model/montage.js';
+import type { Montage, Numerotation, PageMontee, PageSource, Quart, Source } from '../model/montage.js';
 
 /** Ajoute un PDF ouvert et toutes ses pages, a la fin ou avant la position `avant`. C'est la fusion. */
-export function ajouterSource(m: Montage, nom: string, pages: readonly PageSource[], avant = m.pages.length): Montage {
+export function ajouterSource(m: Montage, nom: string, pages: readonly PageSource[], avant = m.pages.length, vierge = false): Montage {
   let n = m.suivant;
-  const source: Source = { id: 's' + n++, nom, pages };
+  const source: Source = vierge ? { id: 's' + n++, nom, pages, vierge } : { id: 's' + n++, nom, pages };
   const nouvelles: PageMontee[] = pages.map((_, index) => ({ id: 'p' + n++, source: source.id, index, rotation: 0 }));
   const position = Math.max(0, Math.min(m.pages.length, avant));
   return {
+    ...m,
     sources: [...m.sources, source],
     pages: [...m.pages.slice(0, position), ...nouvelles, ...m.pages.slice(position)],
     suivant: n
@@ -105,4 +106,33 @@ export function nomsDesParties(nom: string, nombre: number): string[] {
   const racine = nom.replace(/\.pdf$/i, '') || 'document';
   const chiffres = String(nombre).length;
   return Array.from({ length: nombre }, (_, k) => racine + '-' + String(k + 1).padStart(chiffres, '0') + '.pdf');
+}
+
+/**
+ * Duplique les pages designees : chaque copie se pose juste apres le groupe de pages choisies qui se suivent, dans
+ * le meme ordre (choisir 2 et 3 donne 2, 3, 2', 3'). Les copies ont leurs propres identifiants.
+ */
+export function dupliquerPages(m: Montage, ids: ReadonlySet<string>): Montage {
+  if (!m.pages.some(p => ids.has(p.id))) return m;
+  let n = m.suivant;
+  const pages: PageMontee[] = [];
+  let groupe: PageMontee[] = [];
+  const vider = () => { pages.push(...groupe.map(p => ({ ...p, id: 'p' + n++ }))); groupe = []; };
+  for (const p of m.pages) {
+    if (ids.has(p.id)) { pages.push(p); groupe.push(p); }
+    else { vider(); pages.push(p); }
+  }
+  vider();
+  return { ...m, pages, suivant: n };
+}
+
+/** Pose (ou retire, avec null) la numerotation des pages. */
+export function numeroter(m: Montage, numerotation: Numerotation | null): Montage {
+  if (numerotation === null) {
+    if (m.numerotation === undefined) return m;
+    return { sources: m.sources, pages: m.pages, suivant: m.suivant };
+  }
+  const n = m.numerotation;
+  if (n !== undefined && n.position === numerotation.position && n.format === numerotation.format && n.debut === numerotation.debut && n.sauterPremiere === numerotation.sauterPremiere) return m;
+  return { ...m, numerotation };
 }

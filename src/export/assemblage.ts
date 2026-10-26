@@ -11,7 +11,10 @@
 import { degrees, PDFDocument, type PDFPage } from 'pdf-lib';
 import type { Montage } from '../model/montage.js';
 import { au } from '../util/tableaux.js';
+import { placeDuNumero, TAILLE_NUMERO, texteDuNumero } from '../engine/numerotation.js';
+import { tailleVue } from '../geometry/repere.js';
 import { finirStructure, preparerStructure, type PagePosee, type StructureSource } from './structure.js';
+import { policeDeSurimpression, poserLignes, repereDe } from './surimpression.js';
 
 /** Les octets de chaque source, par identifiant. Ils vivent dans io ; le montage ne les porte pas. */
 export type OctetsDesSources = ReadonlyMap<string, Uint8Array>;
@@ -82,6 +85,18 @@ export async function assemblerPrepare(m: Montage, sources: SourcesPreparees, re
   }
   finirStructure(sortie, posees, sources.structures, sources.docs);
   if (retouche !== undefined) for (const [k, p] of posees.entries()) await retouche(p.page, k, sortie);
+  const numeros = m.numerotation;
+  if (numeros !== undefined) {
+    const police = await policeDeSurimpression(sortie);
+    for (const [k, p] of posees.entries()) {
+      const texte = texteDuNumero(numeros, k, posees.length);
+      if (texte === null) continue;
+      const { boite, rotation } = repereDe(p.page);
+      const vue = tailleVue(boite, rotation);
+      const { u, v } = placeDuNumero(numeros.position, vue.largeur, vue.hauteur, police.widthOfTextAtSize(texte, TAILLE_NUMERO));
+      poserLignes(sortie, p.page, police, [{ texte, u, v, taille: TAILLE_NUMERO, angle: 0, largeur: null }], false);
+    }
+  }
   return sortie.save({ useObjectStreams: true, updateFieldAppearances: false });
 }
 

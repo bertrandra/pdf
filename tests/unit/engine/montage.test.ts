@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ajouterSource, deplacerPages, garderPages, idsAuxPositions, inverserPages, nomsDesParties, partiesDeScission,
-  pivoterPages, retirerPages, scinder
+  ajouterSource, deplacerPages, dupliquerPages, garderPages, idsAuxPositions, inverserPages, nomsDesParties, partiesDeScission,
+  numeroter, pivoterPages, retirerPages, scinder
 } from '../../../src/engine/montage.js';
 import { MONTAGE_VIDE, tailleVue, type Montage, type PageSource } from '../../../src/model/montage.js';
 
@@ -94,5 +94,24 @@ describe('scission', () => {
     expect(nomsDesParties('rapport.PDF', 3)).toEqual(['rapport-1.pdf', 'rapport-2.pdf', 'rapport-3.pdf']);
     expect(nomsDesParties('x.pdf', 12)[0]).toBe('x-01.pdf');
     expect(nomsDesParties('.pdf', 1)).toEqual(['document-1.pdf']);
+  });
+});
+
+describe('dupliquerPages et numeroter', () => {
+  it('pose les copies apres chaque groupe de pages choisies qui se suivent, avec leurs propres ids', () => {
+    const m = ajouterSource(MONTAGE_VIDE, 'a.pdf', Array.from({ length: 4 }, () => ({ largeur: 1, hauteur: 1, rotation: 0 as const })));
+    const d = dupliquerPages(m, idsAuxPositions(m, [1, 2, 3]));
+    expect(d.pages.map(p => p.index)).toEqual([0, 1, 2, 3, 1, 2, 3]);
+    expect(new Set(d.pages.map(p => p.id)).size).toBe(7);
+    expect(dupliquerPages(m, new Set())).toBe(m);
+  });
+
+  it('pose et retire la numerotation, sans rien empiler quand rien ne change', () => {
+    const n = { position: 'bas-centre', format: 'n', debut: 1, sauterPremiere: false } as const;
+    const m = numeroter(MONTAGE_VIDE, n);
+    expect(m.numerotation).toEqual(n);
+    expect(numeroter(m, { ...n })).toBe(m);
+    expect(numeroter(m, null)).toEqual(MONTAGE_VIDE);
+    expect(numeroter(MONTAGE_VIDE, null)).toBe(MONTAGE_VIDE);
   });
 });
