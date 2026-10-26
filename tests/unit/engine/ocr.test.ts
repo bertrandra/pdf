@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { boitesOcr, effacerLignes, ligneSure, lignesDeCouche, lignesOcrPosees, paragraphesOcr, type LigneOcr, type MotOcr } from '../../../src/engine/ocr.js';
+import { boitesOcr, effacerLignes, ligneSure, lignesDeCouche, lignesOcrPosees, noteOcr, sensDeLecture, paragraphesOcr, type LigneOcr, type MotOcr } from '../../../src/engine/ocr.js';
 
 /** Un mot de 10 px de haut sur la ligne de base y = 100, de `x` a `x + 10 * longueur`. */
 const mot = (texte: string, x: number, confiance = 90): MotOcr => ({ texte, confiance, boite: { x0: x, y0: 90, x1: x + 10 * texte.length, y1: 100 } });
@@ -95,5 +95,21 @@ describe('lignesDeCouche', () => {
     expect(lignes[0]?.largeur).toBe(posees[0]?.largeur);
     // La ligne de base est sous le haut de la boite, de l'ascendante de la police.
     expect((lignes[0]?.v ?? 0) - (posees[0]?.haut ?? 0)).toBeCloseTo(0.9 * (posees[0]?.taille ?? 0));
+  });
+});
+
+describe('noteOcr et sensDeLecture', () => {
+  it('note les caracteres des lignes sures, ponderes par leur confiance', () => {
+    expect(noteOcr([{ lignes: [ligne([mot('Bonjour', 0, 100), mot('ami', 80, 50)]), ligne([mot('zz', 0, 10)])] }])).toBeCloseTo(7 + 1.5);
+    expect(noteOcr([])).toBe(0);
+  });
+
+  it('ne tourne une page que si un autre sens fait nettement mieux', () => {
+    expect(sensDeLecture(new Map([[0, 300]]))).toBe(0);
+    expect(sensDeLecture(new Map([[0, 5], [90, 12], [180, 260], [270, 8]]))).toBe(180);
+    // Mieux, mais pas deux fois mieux : la page reste telle quelle.
+    expect(sensDeLecture(new Map([[0, 30], [90, 50]]))).toBe(0);
+    // Deux fois mieux, mais trop peu pour etre sur (une page presque blanche).
+    expect(sensDeLecture(new Map([[0, 3], [270, 20]]))).toBe(0);
   });
 });

@@ -10,6 +10,9 @@ s'écrit autrement. Un PDF sans rien de cela garde ses octets.
 
 ### Modifié
 
+- La reconnaissance de caractères (OCR) lit plusieurs pages à la fois et reste prête entre deux conversions : six
+  pages scannées passent de 35 à 19 secondes sur quatre cœurs, 17 à la conversion suivante.
+- La roue d'attente dit quand la reconnaissance se charge, puis les pages finies.
 - Les signets, les liens internes et les champs de formulaire suivent les pages dans la fusion, le découpage et la
   scission : un signet dont la page est coupée part (ou mène à la première page gardée sous lui), un lien vers une
   page absente est retiré, deux champs de même nom venus de deux fichiers ne partagent plus leur valeur (`nom_2`).
@@ -19,6 +22,10 @@ s'écrit autrement. Un PDF sans rien de cela garde ses octets.
 
 ### Ajouté
 
+- Choisir les langues des pages scannées (français, anglais) dans la boîte de conversion ; la page s'en souvient.
+  Le français seul charge 3 Mo au lieu de 16.
+- Une page scannée de côté ou à l'envers se lit dans son sens : droite dans PowerPoint et Word, et sa couche de texte
+  suit ses lignes dans le PDF cherchable. Le message dit combien de pages ont été lues dans l'autre sens.
 - Arrêter une scission ou une conversion en cours (« Arrêter » sur la roue d'attente, ou Échap) ; rien n'est
   enregistré, et la page le dit.
 - Le navigateur demande confirmation avant de fermer ou de recharger une page qui a du travail.

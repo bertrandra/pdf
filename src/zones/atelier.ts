@@ -17,6 +17,7 @@ import { pdfBlanc } from '../export/pageBlanche.js';
 import { ecrireZip } from '../export/zip.js';
 import { declarerSource, oublierSource, protectionDe } from '../io/apercu.js';
 import { convertir, type FormatConversion } from '../io/conversion.js';
+import type { LangueOcr } from '../io/ocr.js';
 import { lireFichier, telecharger } from '../io/fichiers.js';
 import { fichierPdf, lirePdf } from '../io/lecture.js';
 import { MONTAGE_VIDE, pageSource, tailleVue, type Montage, type Numerotation } from '../model/montage.js';
@@ -37,6 +38,13 @@ export function refusProtege(protection: 'proprietaire' | 'mot-de-passe' | 'inco
     return 'ce PDF s’ouvre, mais son auteur en interdit la modification : retirez cette protection (dans le logiciel qui l’a produit), puis rouvrez-le.';
   }
   return 'ce PDF est protégé par un mot de passe : retirez la protection, puis rouvrez-le.';
+}
+
+/** Ce que dit la roue d'attente pendant une conversion. */
+export function avancee(etape: 'chargement' | 'ocr' | 'page', fait: number, total: number): string {
+  if (etape === 'chargement') return 'Chargement de la reconnaissance du texte (OCR)…';
+  if (etape === 'ocr') return 'Reconnaissance du texte (OCR) : page ' + fait + ' sur ' + total + '…';
+  return 'Conversion : ' + fait + ' page' + (fait > 1 ? 's' : '') + ' sur ' + total + '…';
 }
 
 /** Le message quand la personne a refuse l'enregistrement que l'hote lui proposait : un choix, pas un echec. */
@@ -218,20 +226,19 @@ export function useAtelier() {
    * Convertit le montage entier, ou seulement les pages choisies. La barre d'etat dit l'avancee a chaque page ; la
    * conversion s'arrete a la page suivante quand on le demande.
    */
-  const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean, ocr: boolean) => {
+  const convertirEn = useCallback(async (format: FormatConversion, seulementChoisies: boolean, langues: readonly LangueOcr[] | null) => {
     const m = seulementChoisies ? { ...montage, pages: montage.pages.filter(p => selection.ids.has(p.id)) } : montage;
     const racine = nomDeSortie(montage).replace(/\.pdf$/i, '');
     try {
       const arretee = await mener('Préparation de la conversion…', true, async signal => {
-        const converti = await convertir(m, octets.current, format, ocr, (fait, total, reconnaissance) => {
-          setTravail((reconnaissance ? 'Reconnaissance du texte (OCR) : page ' : 'Conversion : page ') + fait + ' sur ' + total + '…');
-        }, signal);
+        const converti = await convertir(m, octets.current, format, langues, (etape, fait, total) => setTravail(avancee(etape, fait, total)), signal);
         signal.throwIfAborted();
         // Un PDF cherchable ne doit pas ecraser l'original par megarde : il porte son propre nom.
         const nom = racine + (format === 'pdf-cherchable' ? '-cherchable' : format === 'images' ? '-pages' : '') + '.' + converti.extension;
         const remise = await telecharger(converti.octets, nom, converti.type);
         if (remise === 'refuse') setMessage(ANNULE);
-        else setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page') + ').' });
+        else setMessage({ type: 'info', texte: '« ' + nom + ' » enregistré (' + pluriel(m.pages.length, 'page')
+          + (converti.redressees > 0 ? ', dont ' + pluriel(converti.redressees, 'page') + ' lue' + (converti.redressees > 1 ? 's' : '') + ' dans l’autre sens' : '') + ').' });
       });
       if (arretee) setMessage({ type: 'info', texte: 'Conversion arrêtée : rien n’a été enregistré.' });
     } catch (e) {

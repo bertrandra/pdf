@@ -222,15 +222,18 @@ export function toileDePage(id: string, index: number, rotation: Quart, largeur:
 
 /**
  * Une page scannee rendue modifiable (ADR-0007) : dessinee a `largeurOcr` pixels (300 dpi), reconnue par `reconnaitre`
- * (io/ocr.ts), ses lignes sures effacees de l'image (couvertes par la couleur du papier, leur encre lue avant), puis
- * l'image ramenee a `largeurFond` pour servir de fond. `largeurPoints` est la largeur vue de la page, en points.
+ * (io/ocr.ts, qui peut la lire dans un autre sens et rendre la toile tournee), ses lignes sures effacees de l'image
+ * (couvertes par la couleur du papier, leur encre lue avant), puis l'image ramenee a `largeurFond` pixels de large
+ * (dans son sens de lecture) pour servir de fond. `taille` est la taille vue de la page, en points ; `quart` dit de
+ * combien la page a ete tournee pour se lire.
  */
 export async function pageScannee(
-  id: string, index: number, rotation: Quart, largeurPoints: number, largeurOcr: number, largeurFond: number, format: 'jpeg' | 'png',
-  reconnaitre: (toile: HTMLCanvasElement) => Promise<ParagrapheOcr[]>
-): Promise<{ image: Uint8Array; lignes: LigneColoree[] }> {
-  const toile = await toileDePage(id, index, rotation, largeurOcr);
-  const paragraphes = await reconnaitre(toile);
+  id: string, index: number, rotation: Quart, taille: { largeur: number; hauteur: number }, largeurOcr: number, largeurFond: number, format: 'jpeg' | 'png',
+  reconnaitre: (toile: HTMLCanvasElement) => Promise<{ paragraphes: ParagrapheOcr[]; quart: Quart; toile: HTMLCanvasElement }>
+): Promise<{ image: Uint8Array; lignes: LigneColoree[]; quart: Quart }> {
+  const lue = await reconnaitre(await toileDePage(id, index, rotation, largeurOcr));
+  const { paragraphes, quart, toile } = lue;
+  const largeurPoints = quart === 90 || quart === 270 ? taille.hauteur : taille.largeur;
   const lignes = lignesOcrPosees(paragraphes, largeurPoints / toile.width);
   const boites = boitesOcr(paragraphes);
   const contexte = toile.getContext('2d', { willReadFrequently: true });
@@ -247,7 +250,7 @@ export async function pageScannee(
   if (c !== null) { c.imageSmoothingQuality = 'high'; c.drawImage(toile, 0, 0, fond.width, fond.height); }
   toile.width = 0;
   // Une ligne dont l'encre ne se distingue pas du papier reste noire : elle a ete reconnue, elle se lit.
-  return { image: await encoder(fond, format), lignes: lignes.map((l, i) => ({ ...l, couleur: couleurs[i] ?? '000000' })) };
+  return { image: await encoder(fond, format), lignes: lignes.map((l, i) => ({ ...l, couleur: couleurs[i] ?? '000000' })), quart };
 }
 
 /**

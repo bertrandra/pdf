@@ -96,6 +96,33 @@ export function lignesDeCouche(paragraphes: readonly ParagrapheOcr[], pointsParP
   }));
 }
 
+/** Un quart de tour, dans le sens des aiguilles d'une montre. */
+export type QuartOcr = 0 | 90 | 180 | 270;
+
+/**
+ * Ce que vaut une reconnaissance : le nombre de caracteres des lignes sures, ponderes par leur confiance (0 a 1). Une
+ * page lue a l'envers ou de cote rend peu de lignes sures, et peu confiantes : sa note s'effondre.
+ */
+export function noteOcr(paragraphes: readonly ParagrapheOcr[], seuil = SEUIL_CONFIANCE): number {
+  return paragraphes.flatMap(p => p.lignes).filter(l => ligneSure(l, seuil)).reduce((n, l) =>
+    n + l.mots.reduce((m, w) => m + w.texte.trim().length * Math.max(0, Math.min(100, w.confiance)) / 100, 0), 0);
+}
+
+/** En dessous de cette note, une page droite a peut-etre ete scannee de cote ou a l'envers : on essaie les autres sens. */
+export const NOTE_DOUTEUSE = 40;
+
+/**
+ * Le sens dans lequel lire une page, d'apres la note de chaque essai (au moins celui de la page telle quelle, `0`). Un
+ * autre sens ne gagne que s'il fait nettement mieux : une note au moins double, et au-dessus du doute. Sinon la page
+ * reste telle qu'on la voit : mieux vaut un texte mal lu qu'une page tournee a tort.
+ */
+export function sensDeLecture(notes: ReadonlyMap<QuartOcr, number>): QuartOcr {
+  const droite = notes.get(0) ?? 0;
+  let meilleur: QuartOcr = 0, note = droite;
+  for (const [q, n] of notes) if (n > note) { meilleur = q; note = n; }
+  return meilleur !== 0 && note >= NOTE_DOUTEUSE && note >= 2 * droite ? meilleur : 0;
+}
+
 /** Les boites a effacer de l'image, dans l'ordre de `lignesOcrPosees` : une par cellule des lignes sures. */
 export function boitesOcr(paragraphes: readonly ParagrapheOcr[], seuil = SEUIL_CONFIANCE): BoiteOcr[] {
   return paragraphes.flatMap(p => p.lignes).filter(l => ligneSure(l, seuil)).flatMap(l => cellules(l).flatMap(mots => {
