@@ -136,3 +136,25 @@ export function numeroter(m: Montage, numerotation: Numerotation | null): Montag
   if (n !== undefined && n.position === numerotation.position && n.format === numerotation.format && n.debut === numerotation.debut && n.sauterPremiere === numerotation.sauterPremiere) return m;
   return { ...m, numerotation };
 }
+
+/** Un fichier lu, pret a entrer dans le montage, ou le refus qui dit pourquoi il n'y entre pas. */
+export type FichierLu = { readonly nom: string; readonly pages: readonly PageSource[] } | { readonly nom: string; readonly erreur: string };
+
+/**
+ * Fait entrer des fichiers lus dans le montage, a la suite les uns des autres, a la position `avant` (au bout par
+ * defaut). Un fichier refuse n'empeche pas les autres. Rend le montage, l'identifiant de source donne a chaque fichier
+ * (null pour un refus), les refus nommes, et le nombre de pages ajoutees.
+ */
+export function integrerFichiers(m: Montage, lus: readonly FichierLu[], avant = m.pages.length):
+  { montage: Montage; sources: (string | null)[]; refus: string[]; ajoutees: number } {
+  let montage = m, position = Math.max(0, Math.min(m.pages.length, avant)), ajoutees = 0;
+  const sources: (string | null)[] = [], refus: string[] = [];
+  for (const l of lus) {
+    if ('erreur' in l) { refus.push('« ' + l.nom + ' » : ' + l.erreur); sources.push(null); continue; }
+    montage = ajouterSource(montage, l.nom, l.pages, position);
+    position += l.pages.length;
+    ajoutees += l.pages.length;
+    sources.push(montage.sources[montage.sources.length - 1]?.id ?? null);
+  }
+  return { montage, sources, refus, ajoutees };
+}

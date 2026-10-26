@@ -135,7 +135,7 @@ export async function texteDePage(id: string, index: number): Promise<Fragment[]
 }
 
 /** Encode une toile en JPEG ou PNG, puis la rend a la memoire. */
-async function encoder(toile: HTMLCanvasElement, format: 'jpeg' | 'png'): Promise<Uint8Array> {
+export async function encoder(toile: HTMLCanvasElement, format: 'jpeg' | 'png'): Promise<Uint8Array> {
   const blob = await new Promise<Blob | null>(ok => toile.toBlob(ok, 'image/' + format, 0.88));
   toile.width = 0;
   toile.height = 0;
@@ -248,4 +248,25 @@ export async function pageScannee(
   toile.width = 0;
   // Une ligne dont l'encre ne se distingue pas du papier reste noire : elle a ete reconnue, elle se lit.
   return { image: await encoder(fond, format), lignes: lignes.map((l, i) => ({ ...l, couleur: couleurs[i] ?? '000000' })) };
+}
+
+/**
+ * La protection d'un PDF chiffre, que pdf-lib ne sait pas lire : `proprietaire` s'il s'ouvre sans mot de passe (une
+ * protection qui interdit seulement de le modifier ou de l'imprimer, comme sur beaucoup de releves et de factures),
+ * `mot-de-passe` s'il en demande un pour s'ouvrir, `inconnue` si pdf.js n'a pas pu le dire.
+ */
+export async function protectionDe(octets: Uint8Array): Promise<'proprietaire' | 'mot-de-passe' | 'inconnue'> {
+  try {
+    const m = await pdfjs();
+    const doc = await m.getDocument({ data: octets.slice(), isEvalSupported: false }).promise;
+    await doc.destroy();
+    return 'proprietaire';
+  } catch (e) {
+    return e instanceof Error && e.name === 'PasswordException' ? 'mot-de-passe' : 'inconnue';
+  }
+}
+
+/** L'image d'une page, a la largeur demandee, en PNG ou JPEG (l'export en images). */
+export async function imageDePage(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<Uint8Array> {
+  return encoder(await toileDePage(id, index, rotation, largeur), format);
 }

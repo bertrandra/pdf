@@ -1,6 +1,6 @@
 // La grille des vignettes (ADR-0003) : on y voit le document entier, on y choisit, range et coupe. Elle se zoome
 // par paliers (Ctrl+molette, pincement, + et -, ou le curseur de la barre) ; un double clic ou Entree ouvre la
-// page en grand. Les pages se rangent en les glissant, ou au clavier par Alt+fleches ; un PDF depose sur la grille
+// page en grand. Ctrl+D duplique. Les pages se rangent en les glissant, ou au clavier par Alt+fleches ; un PDF depose sur la grille
 // s'insere la ou on le lache. Une seule tabulation entre dans la grille : les fleches y deplacent le focus
 // (aria-activedescendant), Tab en ressort.
 
@@ -79,6 +79,8 @@ export function Grille({ atelier, ouvrir }: { atelier: Atelier; ouvrir: (id: str
       setSelection(s => toucher(s, ordre, courant, { etendre: e.shiftKey, basculer: true }));
     } else if (e.key === 'Enter' && courant !== undefined) {
       ouvrir(courant);
+    } else if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) {
+      atelier.dupliquer(choisies);
     } else if ((e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey)) {
       setSelection(s => toutOuRien(s, ordre));
     } else if (e.key === 'Delete' || e.key === 'Backspace') {

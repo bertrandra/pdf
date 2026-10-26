@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ajouterSource, deplacerPages, dupliquerPages, garderPages, idsAuxPositions, inverserPages, nomsDesParties, partiesDeScission,
+  ajouterSource, deplacerPages, dupliquerPages, garderPages, integrerFichiers, idsAuxPositions, inverserPages, nomsDesParties, partiesDeScission,
   numeroter, pivoterPages, retirerPages, scinder
 } from '../../../src/engine/montage.js';
 import { MONTAGE_VIDE, tailleVue, type Montage, type PageSource } from '../../../src/model/montage.js';
@@ -113,5 +113,16 @@ describe('dupliquerPages et numeroter', () => {
     expect(numeroter(m, { ...n })).toBe(m);
     expect(numeroter(m, null)).toEqual(MONTAGE_VIDE);
     expect(numeroter(MONTAGE_VIDE, null)).toBe(MONTAGE_VIDE);
+  });
+});
+
+describe('integrerFichiers', () => {
+  it('ajoute les fichiers lus a la suite, a la position voulue, et nomme les refus sans arreter les autres', () => {
+    const m = ajouterSource(MONTAGE_VIDE, 'a.pdf', [page(), page()]);
+    const r = integrerFichiers(m, [{ nom: 'b.pdf', pages: [page()] }, { nom: 'c.pdf', erreur: 'illisible' }, { nom: 'd.pdf', pages: [page(), page()] }], 1);
+    expect(r.montage.pages.map(p => p.source)).toEqual(['s1', 's4', 's6', 's6', 's1']);
+    expect(r.sources).toEqual(['s4', null, 's6']);
+    expect(r.refus).toEqual(['« c.pdf » : illisible']);
+    expect(r.ajoutees).toBe(3);
   });
 });

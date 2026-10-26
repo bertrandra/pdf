@@ -6,7 +6,8 @@ import { PDFDocument } from 'pdf-lib';
 import { CHARGEMENT } from '../export/assemblage.js';
 import type { PageSource, Quart } from '../model/montage.js';
 
-export type PdfLu = { readonly pages: readonly PageSource[] } | { readonly erreur: string };
+/** Un PDF lu, ou un refus nomme. `chiffre` : le fichier est protege ; io/apercu.ts dit s'il faut un mot de passe pour l'ouvrir. */
+export type PdfLu = { readonly pages: readonly PageSource[] } | { readonly erreur: string; readonly chiffre?: true };
 
 /** Au-dela, un fichier ne s'ouvre pas : il ne tiendrait pas en memoire avec ses apercus. */
 export const TAILLE_MAX = 512 * 1024 * 1024;
@@ -34,7 +35,7 @@ export async function lirePdf(octets: Uint8Array): Promise<PdfLu> {
     doc = await PDFDocument.load(octets, CHARGEMENT);
   } catch (e) {
     const message = e instanceof Error ? e.message : '';
-    if (/encrypt/i.test(message)) return { erreur: 'Ce PDF est protégé par un mot de passe : retirez la protection, puis rouvrez-le.' };
+    if (/encrypt/i.test(message)) return { erreur: 'Ce PDF est protégé par un mot de passe : retirez la protection, puis rouvrez-le.', chiffre: true };
     return { erreur: 'Ce PDF est illisible (fichier tronqué ou abîmé).' };
   }
   const pages = doc.getPages().map(p => {
