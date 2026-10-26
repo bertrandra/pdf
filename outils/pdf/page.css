@@ -1,0 +1,93 @@
+/* La feuille de la page. Chaque valeur est une variable du registre (src/styles/) : un test refuse une couleur,
+   une taille de texte, un rayon ou une couche ecrits en dur (tests/unit/styles/jetons.test.ts). */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--table); color: var(--encre); font-family: var(--sans); font-size: var(--texte-corps); line-height: 1.45; }
+::selection { background: var(--selection); color: var(--encre); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.discret-texte { color: var(--encre-douce); }
+code { font-family: var(--mono); font-size: var(--texte-petit); }
+
+/* Les boutons : secondaires par defaut, une seule action pleine (.primaire) par ecran. 40 px au doigt. */
+button { font: inherit; font-size: var(--texte-compact); color: var(--encre); background: var(--panneau); border: 1px solid var(--filet-fort);
+  border-radius: var(--rayon-bouton); padding: var(--esp-s) var(--esp-l); min-height: 32px; cursor: pointer; }
+button:hover:not(:disabled) { background: var(--survol); }
+button:disabled { cursor: default; opacity: 0.45; }
+button[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+button.primaire { background: var(--cyan); color: var(--sur-cyan); border-color: var(--cyan); font-weight: 600; }
+button.primaire:hover:not(:disabled) { background: var(--cyan-fonce); border-color: var(--cyan-fonce); }
+button.destructif { color: var(--echec); }
+@media (pointer: coarse) { button { min-height: 40px; min-width: 40px; } }
+input, textarea { font: inherit; color: var(--encre); background: var(--panneau); border: 1px solid var(--filet-fort); border-radius: var(--rayon-champ); padding: var(--esp-xs) var(--esp-m); }
+input[aria-invalid="true"] { border-color: var(--echec); }
+input[type="range"] { accent-color: var(--cyan); padding: 0; border: 0; background: transparent; }
+input[type="radio"] { accent-color: var(--cyan); }
+
+.application { min-height: 100%; display: flex; flex-direction: column; }
+.barre { position: sticky; top: 0; z-index: var(--couche-barre); display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-m) var(--esp-l);
+  padding: var(--esp-m) var(--esp-xl); background: var(--panneau); border-bottom: 1px solid var(--filet); }
+.groupe { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-xs); }
+.pousse { flex: 1 1 auto; }
+.choisir { display: flex; align-items: center; gap: var(--esp-xs); flex-wrap: wrap; }
+.champ-ligne { display: flex; align-items: center; gap: var(--esp-s); font-size: var(--texte-compact); }
+.zoom input[type="range"] { width: 120px; }
+
+.etat { margin: 0; padding: var(--esp-xs) var(--esp-xl); min-height: 1.8em; font-size: var(--texte-compact); }
+.message { border-radius: var(--rayon-bouton); padding: var(--esp-2xs) var(--esp-m); }
+.message.alerte { color: var(--alerte); background: var(--alerte-fond); }
+.message.echec { color: var(--echec); background: var(--echec-fond); }
+
+/* La zone de depot, quand rien n'est ouvert. */
+.depot { margin: var(--esp-2xl) auto; max-width: 640px; width: calc(100% - 2 * var(--esp-xl)); padding: var(--esp-3xl) var(--esp-xl); display: grid; gap: var(--esp-l);
+  justify-items: center; text-align: center; border: 2px dashed var(--filet-fort); border-radius: var(--rayon-carte); background: var(--panneau); }
+.depot.survol { border-color: var(--cyan); background: var(--survol); }
+.depot h1 { font-size: var(--texte-titre-page); margin: 0; }
+.depot p { margin: 0; }
+
+/* La grille : des cases de la taille du palier de zoom (--cote), qui se remplissent ligne a ligne. */
+.travail { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0 var(--esp-xl) var(--esp-xl); gap: var(--esp-m); }
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cote), 1fr)); justify-items: center; gap: var(--esp-xl) var(--esp-l);
+  padding: var(--esp-l); border-radius: var(--rayon-carte); align-content: start; flex: 1 1 auto; }
+.grille:focus-visible { outline-offset: -2px; }
+.vignette { position: relative; display: grid; gap: var(--esp-xs); justify-items: center; padding: var(--esp-s); border-radius: var(--rayon-menu);
+  border: 2px solid transparent; cursor: pointer; user-select: none; }
+.vignette:hover { background: var(--survol); }
+.vignette.choisie { background: var(--selection); border-color: var(--cyan); }
+.grille:focus-visible .vignette.active { outline: 2px dashed var(--cyan); outline-offset: 2px; }
+.vignette.repere-avant::before, .vignette.repere-apres::after { content: ""; position: absolute; top: 0; bottom: 0; width: 3px; background: var(--cyan);
+  border-radius: var(--rayon-pastille); z-index: var(--couche-glisser); }
+.vignette.repere-avant::before { left: calc(-1 * var(--esp-s)); }
+.vignette.repere-apres::after { right: calc(-1 * var(--esp-s)); }
+.feuille-cadre { display: flex; align-items: center; justify-content: center; position: relative; }
+.feuille { display: block; background: var(--papier); box-shadow: 0 1px 4px var(--ombre); }
+.feuille-echec { position: absolute; font-size: var(--texte-petit); color: var(--echec); }
+.numero { font-size: var(--texte-compact); color: var(--encre-douce); font-variant-numeric: tabular-nums; }
+.vignette.choisie .numero { color: var(--encre); font-weight: 600; }
+.tour { font-size: var(--texte-petit); }
+.aide { margin: 0; font-size: var(--texte-petit); }
+
+/* L'apercu en grand. */
+.apercu-voile, .voile { position: fixed; inset: 0; background: var(--voile); display: flex; z-index: var(--couche-apercu); }
+.voile { z-index: var(--couche-dialogue); align-items: center; justify-content: center; padding: var(--esp-xl); }
+.apercu { margin: var(--esp-l); flex: 1 1 auto; display: flex; flex-direction: column; background: var(--table); border-radius: var(--rayon-carte); overflow: hidden; }
+.apercu-barre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-m) var(--esp-l); padding: var(--esp-m) var(--esp-l); background: var(--panneau);
+  border-bottom: 1px solid var(--filet); }
+.apercu-titre { flex: 1 1 auto; font-size: var(--texte-titre); font-weight: 600; }
+.pourcentage { min-width: 4.5em; text-align: center; font-variant-numeric: tabular-nums; font-size: var(--texte-compact); }
+.apercu-zone { flex: 1 1 auto; overflow: auto; padding: var(--esp-xl); display: grid; }
+.apercu-page { margin: auto; }
+
+/* La boite de scission. */
+.boite { background: var(--panneau); border-radius: var(--rayon-carte); padding: var(--esp-xl); width: min(560px, 100%); max-height: 100%; overflow: auto;
+  display: grid; gap: var(--esp-l); box-shadow: 0 8px 32px var(--ombre); }
+.boite h2 { margin: 0; font-size: var(--texte-titre); }
+.boite fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: var(--esp-m); }
+.option-scission { display: grid; gap: var(--esp-s); }
+.champ { display: grid; gap: var(--esp-xs); padding-left: var(--esp-2xl); font-size: var(--texte-compact); color: var(--encre-douce); }
+.resume p { margin: 0 0 var(--esp-xs); }
+.liste-parties { margin: 0; padding-left: var(--esp-2xl); max-height: 200px; overflow: auto; font-size: var(--texte-compact); }
+.actions { display: flex; justify-content: flex-end; gap: var(--esp-m); }
+
+@media (prefers-reduced-motion: no-preference) { button, .vignette, .depot { transition: background 0.12s, border-color 0.12s; } }
+@media (max-width: 640px) { .barre, .travail { padding-left: var(--esp-l); padding-right: var(--esp-l); } .apercu { margin: 0; border-radius: 0; } }

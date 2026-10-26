@@ -1,0 +1,11 @@
+# Les dependances : sans barre finale, pour que le lien symbolique que prend un worktree d agent
+# (ln -s ../../node_modules) soit ignore comme le dossier.
+node_modules
+dist/
+coverage/
+# Captures et erreurs que les tests de navigateur laissent quand l'un d'eux echoue (tests/e2e/aide.ts).
+test-results/
+*.log
+# Les worktrees des agents (isolation: worktree) : jamais du code du depot.
+.claude/worktrees/
+.claude/settings.local.json
