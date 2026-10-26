@@ -40,8 +40,8 @@ async function deposer(page: Page, fichiers: { name: string; octets: Uint8Array 
 
 
 /** Un scan : du texte dessine dans une image a 300 dpi, legerement penche, enregistre en JPEG, seul dans un PDF. */
-async function pdfScanne(page: Page): Promise<Uint8Array> {
-  const jpeg = await page.evaluate(async () => {
+async function pdfScanne(page: Page, quart: 0 | 90 | 180 | 270 = 0): Promise<Uint8Array> {
+  const jpeg = await page.evaluate(async q => {
     const c = document.createElement('canvas'); c.width = 2480; c.height = 700;
     const x = c.getContext('2d');
     if (x === null) return [];
@@ -49,12 +49,19 @@ async function pdfScanne(page: Page): Promise<Uint8Array> {
     x.rotate(0.6 * Math.PI / 180);
     x.fillStyle = 'black'; x.font = '46px serif';
     ['Le conseil municipal s’est réuni le 14 février.', 'Total TTC : 233,88 € pour 12 ramettes.'].forEach((l, i) => x.fillText(l, 180, 220 + i * 92));
-    const b: Blob | null = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.8));
+    // Un scan pose de cote ou a l'envers sur la vitre : l'image elle-meme est tournee.
+    const t = document.createElement('canvas');
+    t.width = q % 180 === 0 ? c.width : c.height; t.height = q % 180 === 0 ? c.height : c.width;
+    const y = t.getContext('2d');
+    if (y === null) return [];
+    y.translate(t.width / 2, t.height / 2); y.rotate(q * Math.PI / 180); y.drawImage(c, -c.width / 2, -c.height / 2);
+    const b: Blob | null = await new Promise(ok => t.toBlob(ok, 'image/jpeg', 0.8));
     return b ? Array.from(new Uint8Array(await b.arrayBuffer())) : [];
-  });
+  }, quart);
   const doc = await PDFDocument.create({ updateMetadata: false });
   const image = await doc.embedJpg(new Uint8Array(jpeg));
-  doc.addPage([595.28, 168]).drawImage(image, { x: 0, y: 0, width: 595.28, height: 168 });
+  const [l, h] = quart % 180 === 0 ? [595.28, 168] : [168, 595.28];
+  doc.addPage([l, h]).drawImage(image, { x: 0, y: 0, width: l, height: h });
   return doc.save();
 }
 
@@ -188,9 +195,12 @@ describe('la page', () => {
       await expect.poll(() => boite.getByRole('checkbox', { name: /Reconnaître le texte/ }).isChecked()).toBe(true);
       const telechargement = page.waitForEvent('download', { timeout: 120_000 });
       await boite.getByRole('button', { name: 'Convertir la page' }).click();
-      // Pendant la reconnaissance, la roue d'attente dit ce qui se fait, et la page ne se modifie pas.
-      await expect.poll(() => page.locator('.attente').textContent(), { timeout: 30_000 }).toContain('page 1 sur 1');
-      expect(await page.locator('main').getAttribute('inert')).not.toBeNull();
+      // Pendant la reconnaissance, la roue d'attente dit ce qui se fait, et la page ne se modifie pas. La seconde fois,
+      // Tesseract est deja pret : une si petite page se lit avant que la roue n'ait le temps d'apparaitre.
+      if (format === 'PowerPoint (.pptx)') {
+        await expect.poll(() => page.locator('.attente').textContent(), { timeout: 30_000 }).toMatch(/Chargement de la reconnaissance|page 1 sur 1/);
+        expect(await page.locator('main').getAttribute('inert')).not.toBeNull();
+      }
       const fichier = await telechargement;
       await expect.poll(() => page.locator('.attente').count()).toBe(0);
       expect(await page.locator('main').getAttribute('inert')).toBeNull();
@@ -289,6 +299,37 @@ describe('la page', () => {
     const premiere = (scan ?? []).find(t => t.str.includes('conseil'));
     expect(Math.abs((premiere?.v ?? 0) - 53)).toBeLessThan(6);
     expect((texte ?? []).map(t => t.str)).toEqual(['Bonjour 1']);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  }, 240_000);
+
+  it('lit un scan pose de cote ou a l envers, ne charge que la langue choisie, et ne la recharge pas', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    const modeles: string[] = [];
+    page.on('request', r => { if (/\/ocr\/langues\//.test(r.url())) modeles.push(r.url().replace(/.*\//, '')); });
+    await deposer(page, [{ name: 'cote.pdf', octets: await pdfScanne(page, 90) }, { name: 'envers.pdf', octets: await pdfScanne(page, 180) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(2);
+    for (const [format, nom] of [['Word, texte au fil (.docx)', 'cote.docx'], ['PDF cherchable (.pdf)', 'cote-cherchable.pdf']] as const) {
+      await page.getByRole('button', { name: 'Convertir…' }).click();
+      const boite = page.getByRole('dialog');
+      await boite.getByRole('radio', { name: format }).check();
+      const anglais = boite.getByRole('checkbox', { name: 'Anglais' });
+      if (await anglais.isChecked()) await anglais.uncheck();
+      const telechargement = page.waitForEvent('download', { timeout: 120_000 });
+      await boite.getByRole('button', { name: 'Convertir les 2 pages' }).click();
+      const fichier = await telechargement;
+      expect(fichier.suggestedFilename()).toBe(nom);
+      const octets = new Uint8Array(readFileSync(await fichier.path()));
+      const tout = nom.endsWith('.docx')
+        ? [...lireZip(octets).entries()].filter(([n]) => n.endsWith('.xml')).map(([n]) => texte(lireZip(octets), n)).join('')
+        : (await texteVu(octets)).flat().map(t => t.str).join(' ');
+      expect(tout, format).toContain('conseil municipal');
+      expect(tout.split('conseil municipal').length - 1, format).toBe(2);
+      await expect.poll(() => page.locator('[role=status]').textContent()).toContain('dont 2 pages lues dans l’autre sens');
+    }
+    // Le francais seul, lu une fois pour les deux conversions : l'anglais n'est jamais demande.
+    expect(modeles.filter(m => m.startsWith('eng'))).toEqual([]);
+    expect(modeles.filter(m => m === 'fra.json')).toEqual(['fra.json']);
     expect(erreurs).toEqual([]);
     await page.close();
   }, 240_000);

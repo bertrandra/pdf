@@ -3,6 +3,24 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { FormatConversion } from '../io/conversion.js';
+import { LANGUES_OCR, NOMS_LANGUES, type LangueOcr } from '../io/ocr.js';
+
+/** Ou la page se souvient des langues choisies, pour cette personne, sur cet ordinateur : une commodite, rien de plus. */
+const CLE_LANGUES = 'pdf.langues-ocr';
+
+function languesRetenues(): LangueOcr[] {
+  try {
+    const lu = JSON.parse(localStorage.getItem(CLE_LANGUES) ?? 'null') as unknown;
+    const langues = Array.isArray(lu) ? LANGUES_OCR.filter(l => lu.includes(l)) : [];
+    return langues.length > 0 ? langues : [...LANGUES_OCR];
+  } catch {
+    return [...LANGUES_OCR];
+  }
+}
+
+function retenirLangues(langues: readonly LangueOcr[]): void {
+  try { localStorage.setItem(CLE_LANGUES, JSON.stringify(langues)); } catch { /* stockage indisponible : rien a retenir */ }
+}
 
 const CHOIX: ReadonlyArray<{ format: FormatConversion; titre: string; detail: string }> = [
   { format: 'pptx', titre: 'PowerPoint (.pptx)', detail: 'Une diapositive par page : le texte reste modifiable, chaque ligne à sa place, sur le fond de la page.' },
@@ -13,19 +31,28 @@ const CHOIX: ReadonlyArray<{ format: FormatConversion; titre: string; detail: st
 ];
 
 export function Convertir({ total, choisies, convertir, fermer }: {
-  total: number; choisies: number; convertir: (format: FormatConversion, seulementChoisies: boolean, ocr: boolean) => void; fermer: () => void;
+  total: number; choisies: number; convertir: (format: FormatConversion, seulementChoisies: boolean, langues: readonly LangueOcr[] | null) => void; fermer: () => void;
 }) {
   const [format, setFormat] = useState<FormatConversion>('pptx');
   const [seulementChoisies, setSeulementChoisies] = useState(false);
   const [ocr, setOcr] = useState(true);
+  const [langues, setLangues] = useState<LangueOcr[]>(languesRetenues);
+  const reconnait = format === 'pdf-cherchable' || (format !== 'images' && ocr);
   const premier = useRef<HTMLInputElement>(null);
   useEffect(() => { premier.current?.focus(); }, []);
   const n = seulementChoisies ? choisies : total;
+  const sansLangue = reconnait && langues.length === 0;
+  const basculer = (l: LangueOcr, oui: boolean) => setLangues(ls => LANGUES_OCR.filter(x => (x === l ? oui : ls.includes(x))));
 
   return (
     <div className="voile" onKeyDown={e => { if (e.key === 'Escape') fermer(); }}>
       <form className="boite" role="dialog" aria-modal="true" aria-labelledby="titre-conversion"
-        onSubmit={e => { e.preventDefault(); convertir(format, seulementChoisies, format === 'pdf-cherchable' || ocr); }}>
+        onSubmit={e => {
+          e.preventDefault();
+          if (sansLangue) return;
+          if (reconnait) retenirLangues(langues);
+          convertir(format, seulementChoisies, reconnait ? langues : null);
+        }}>
         <h2 id="titre-conversion">Convertir</h2>
         <fieldset>
           <legend className="discret-texte">Format</legend>
@@ -44,20 +71,30 @@ export function Convertir({ total, choisies, convertir, fermer }: {
           </fieldset>
         ) : null}
         {format === 'images' ? null : format === 'pdf-cherchable' ? (
-          <p className="discret-texte">Le texte des pages scannées est reconnu sur l’ordinateur (OCR), en français et en anglais, avec le modèle le plus précis :
+          <p className="discret-texte">Le texte des pages scannées est reconnu sur l’ordinateur (OCR), avec le modèle le plus précis :
             comptez quelques secondes par page scannée. Une page qui a déjà du texte ne change pas.</p>
         ) : <label className="choix-format">
           <input type="checkbox" checked={ocr} onChange={e => setOcr(e.target.checked)} aria-describedby="aide-ocr" />
           <span><strong>Reconnaître le texte des pages scannées (OCR)</strong><br />
-            <span id="aide-ocr" className="discret-texte">Une page scannée devient du texte modifiable, en français et en anglais, avec le modèle le plus précis.
+            <span id="aide-ocr" className="discret-texte">Une page scannée devient du texte modifiable, avec le modèle le plus précis.
               Comptez quelques secondes par page scannée ; sans cela, elle reste une image.</span></span>
         </label>}
+        {reconnait ? (
+          <fieldset>
+            <legend className="discret-texte">Langues des pages scannées</legend>
+            {LANGUES_OCR.map(l => (
+              <label key={l}><input type="checkbox" checked={langues.includes(l)} onChange={e => basculer(l, e.target.checked)} /> {NOMS_LANGUES[l]}</label>
+            ))}
+            <p className="discret-texte">Une seule langue se charge et se lit plus vite ; une page tournée de côté ou à l’envers est remise dans son sens.</p>
+            {sansLangue ? <p className="message echec" role="alert">Choisissez au moins une langue.</p> : null}
+          </fieldset>
+        ) : null}
         {format === 'pptx' || format === 'docx-fidele'
           ? <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.</p> : null}
         <p className="discret-texte">La conversion se fait dans cette page : rien n’est envoyé. Comptez quelques secondes par dizaine de pages.</p>
         <div className="actions">
           <button type="button" onClick={fermer}>Annuler</button>
-          <button type="submit" className="primaire" disabled={n === 0}>Convertir {n > 1 ? 'les ' + n + ' pages' : 'la page'}</button>
+          <button type="submit" className="primaire" disabled={n === 0 || sansLangue}>Convertir {n > 1 ? 'les ' + n + ' pages' : 'la page'}</button>
         </div>
       </form>
     </div>

@@ -53,11 +53,15 @@ function cleDePolice(page: PDFPage, police: PDFFont): PDFName {
 /** Les pages deja entourees de q/Q : une seconde surimpression (des numeros sur un scan reconnu) ne les rentoure pas. */
 const entourees = new WeakSet<PDFPage>();
 
-/** Pose des lignes sur une page, visibles (noires) ou invisibles (la couche de texte d'un scan). */
-export function poserLignes(doc: PDFDocument, page: PDFPage, police: PDFFont, lignes: readonly LigneAPoser[], invisible: boolean): void {
+/**
+ * Pose des lignes sur une page, visibles (noires) ou invisibles (la couche de texte d'un scan). `tour` : un quart de
+ * tour de plus que la page vue, quand les lignes ont ete placees sur la page tournee pour se lire (un scan de cote).
+ */
+export function poserLignes(doc: PDFDocument, page: PDFPage, police: PDFFont, lignes: readonly LigneAPoser[], invisible: boolean, tour: QuartDeTour = 0): void {
   const ecrites = lignes.map(l => ({ ...l, texte: texteEcrivable(police, l.texte) })).filter(l => l.texte.trim() !== '' && l.taille > 0);
   if (ecrites.length === 0) return;
-  const { boite, rotation } = repereDe(page);
+  const repere = repereDe(page);
+  const boite = repere.boite, rotation = ((repere.rotation + tour) % 360) as QuartDeTour;
   const cle = cleDePolice(page, police);
   const ops: PDFOperator[] = [pushGraphicsState(), beginText(), invisible ? setTextRenderingMode(TextRenderingMode.Invisible) : setFillingGrayscaleColor(0)];
   for (const l of ecrites) {

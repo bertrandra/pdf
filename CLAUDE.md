@@ -74,7 +74,8 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   `tessdata_best` en virgule flottante (fra, eng), cœur sans SIMD, 300 dpi, servis depuis `dist/ocr/` ; les modèles
   sont épinglés par étiquette et sha256 (`data/modeles-ocr.json`, `scripts/modeles-ocr.mjs`, cache `.cache/ocr/`).
   Seule une ligne sûre devient du texte et s'efface du scan (`engine/ocr.ts`) ; changer de modèle se mesure d'abord
-  (taux d'erreur par caractère, voir l'ADR). Tesseract ne vit que dans `io/ocr.ts`.
+  (taux d'erreur par caractère, voir l'ADR). Plusieurs travailleurs, gardés entre deux conversions, langues choisies ;
+  une page mal lue s'essaie dans les quatre sens (`sensDeLecture`). Tesseract ne vit que dans `io/ocr.ts`.
 - **Ce qui suit les pages, ce qui s'y ajoute** (ADR-0008) : signets, liens internes et champs suivent les pages posées
   (`export/structure.ts`, préparation d'une source avant toute copie, puis achèvement du document) ; une scission
   prépare ses sources une fois. Numéros et couche de texte d'un scan se posent dans le repère vu

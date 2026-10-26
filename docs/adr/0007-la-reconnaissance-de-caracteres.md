@@ -40,7 +40,22 @@ du texte modifiable, avec la meilleure justesse possible, sans que la page ne co
 ## Conséquences
 
 - `dist/` grossit d'environ 23 Mo (`ocr/`), chargés seulement à la première page scannée.
-- Pas de détection d'orientation : une page scannée de travers d'un quart de tour se tourne d'abord dans la grille (R).
 - Deux langues seulement ; en ajouter une, c'est une ligne de `data/modeles-ocr.json` (taille, sha256) et
   `LANGUES_OCR`, et un temps de reconnaissance un peu plus long.
 - Tesseract et ses modèles sont sous licence Apache 2.0.
+
+## Évolution — plus vite, dans le bon sens (étape OCR 1)
+
+Sans changer de modèle ni de réglage, donc sans changer ce qui est reconnu sur une page droite :
+
+- **Plusieurs travailleurs** reconnaissent plusieurs pages à la fois (`tailleDuPool` : un par paire de cœurs, trois
+  au plus, un seul sous 4 Go de mémoire), et les pages se composent dans l'ordre (`util/parallele.ts`). Mesuré sur six
+  pages A4 scannées, quatre cœurs (deux travailleurs) : 34,6 s avant, 19,1 s après, 16,8 s à la conversion suivante.
+- **Les travailleurs restent prêts** entre deux conversions et se ferment après cinq minutes sans travail ; les
+  modèles ne se lisent qu'une fois par séance.
+- **Les langues se choisissent** dans la boîte de conversion (la page s'en souvient) : le français seul charge 3,3 Mo
+  au lieu de 16 Mo. Les deux restent cochées par défaut.
+- **Le sens de lecture** : une page dont la lecture est douteuse (note sous `NOTE_DOUTEUSE`, `engine/ocr.ts`) est
+  essayée dans les quatre sens à mi-résolution ; un autre sens ne gagne que s'il fait au moins deux fois mieux. La
+  page se relit alors en entier dans ce sens : droite dans PowerPoint et Word, couche de texte du PDF cherchable posée
+  le long de ses lignes (la page, elle, ne tourne pas). Une page bien lue ne coûte rien de plus.

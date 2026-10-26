@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ajouterSource, idsAuxPositions, pivoterPages } from '../../../src/engine/montage.js';
 import { MONTAGE_VIDE } from '../../../src/model/montage.js';
 import { historique, avancer } from '../../../src/util/historique.js';
-import { nomDeSortie, placeDePageBlanche, refusProtege, sourcesUtiles } from '../../../src/zones/atelier.js';
+import { avancee, nomDeSortie, placeDePageBlanche, refusProtege, sourcesUtiles } from '../../../src/zones/atelier.js';
 
 const page = (largeur: number, hauteur: number) => ({ largeur, hauteur, rotation: 0 as const });
 
@@ -37,5 +37,13 @@ describe('sourcesUtiles et refusProtege', () => {
   it('distingue une protection du proprietaire d un mot de passe', () => {
     expect(refusProtege('proprietaire')).toMatch(/interdit la modification/);
     expect(refusProtege('mot-de-passe')).toMatch(/mot de passe/);
+  });
+});
+
+describe('avancee', () => {
+  it('dit le chargement, la page reconnue, puis les pages finies', () => {
+    expect(avancee('chargement', 0, 3)).toBe('Chargement de la reconnaissance du texte (OCR)…');
+    expect(avancee('ocr', 2, 3)).toBe('Reconnaissance du texte (OCR) : page 2 sur 3…');
+    expect(avancee('page', 1, 3)).toBe('Conversion : 1 page sur 3…');
   });
 });
