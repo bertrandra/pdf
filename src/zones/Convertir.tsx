@@ -1,5 +1,5 @@
-// La boite de conversion : PowerPoint ou Word, et pour Word la facon (fidele ou texte modifiable). Chaque choix
-// dit ce qu'il garde et ce qu'il perd, avant qu'on le lance : une conversion n'est jamais sans perte.
+// La boite de conversion : PowerPoint, Word (mise en page conservee ou texte au fil), PDF cherchable ou images.
+// Chaque choix dit ce qu'il garde et ce qu'il perd, avant qu'on le lance : une conversion n'est jamais sans perte.
 
 import { useEffect, useRef, useState } from 'react';
 import type { FormatConversion } from '../io/conversion.js';
@@ -7,7 +7,9 @@ import type { FormatConversion } from '../io/conversion.js';
 const CHOIX: ReadonlyArray<{ format: FormatConversion; titre: string; detail: string }> = [
   { format: 'pptx', titre: 'PowerPoint (.pptx)', detail: 'Une diapositive par page : le texte reste modifiable, chaque ligne à sa place, sur le fond de la page.' },
   { format: 'docx-fidele', titre: 'Word, mise en page conservée (.docx)', detail: 'Une page Word par page, à la même taille : le texte reste modifiable, chaque ligne à sa place, sur le fond de la page.' },
-  { format: 'docx-texte', titre: 'Word, texte au fil (.docx)', detail: 'Le texte en paragraphes qui se suivent, facile à réécrire ; la mise en page, les images et les tableaux sont perdus.' }
+  { format: 'docx-texte', titre: 'Word, texte au fil (.docx)', detail: 'Le texte en paragraphes qui se suivent, facile à réécrire ; la mise en page, les images et les tableaux sont perdus.' },
+  { format: 'pdf-cherchable', titre: 'PDF cherchable (.pdf)', detail: 'Le même PDF, à l’identique : chaque page scannée reçoit, sous son image, le texte qu’on y lit, pour chercher et copier.' },
+  { format: 'images', titre: 'Images PNG (.png ou .zip)', detail: 'Une image par page, à 150 dpi ; le texte n’est plus que des pixels. Plusieurs pages partent dans une archive ZIP.' }
 ];
 
 export function Convertir({ total, choisies, convertir, fermer }: {
@@ -23,8 +25,8 @@ export function Convertir({ total, choisies, convertir, fermer }: {
   return (
     <div className="voile" onKeyDown={e => { if (e.key === 'Escape') fermer(); }}>
       <form className="boite" role="dialog" aria-modal="true" aria-labelledby="titre-conversion"
-        onSubmit={e => { e.preventDefault(); convertir(format, seulementChoisies, ocr); }}>
-        <h2 id="titre-conversion">Convertir en PowerPoint ou en Word</h2>
+        onSubmit={e => { e.preventDefault(); convertir(format, seulementChoisies, format === 'pdf-cherchable' || ocr); }}>
+        <h2 id="titre-conversion">Convertir</h2>
         <fieldset>
           <legend className="discret-texte">Format</legend>
           {CHOIX.map((c, i) => (
@@ -41,13 +43,17 @@ export function Convertir({ total, choisies, convertir, fermer }: {
             <label><input type="radio" name="pages-conversion" checked={seulementChoisies} onChange={() => setSeulementChoisies(true)} /> Les pages choisies ({choisies})</label>
           </fieldset>
         ) : null}
-        <label className="choix-format">
+        {format === 'images' ? null : format === 'pdf-cherchable' ? (
+          <p className="discret-texte">Le texte des pages scannées est reconnu sur l’ordinateur (OCR), en français et en anglais, avec le modèle le plus précis :
+            comptez quelques secondes par page scannée. Une page qui a déjà du texte ne change pas.</p>
+        ) : <label className="choix-format">
           <input type="checkbox" checked={ocr} onChange={e => setOcr(e.target.checked)} aria-describedby="aide-ocr" />
           <span><strong>Reconnaître le texte des pages scannées (OCR)</strong><br />
             <span id="aide-ocr" className="discret-texte">Une page scannée devient du texte modifiable, en français et en anglais, avec le modèle le plus précis.
               Comptez quelques secondes par page scannée ; sans cela, elle reste une image.</span></span>
-        </label>
-        <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.</p>
+        </label>}
+        {format === 'pptx' || format === 'docx-fidele'
+          ? <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.</p> : null}
         <p className="discret-texte">La conversion se fait dans cette page : rien n’est envoyé. Comptez quelques secondes par dizaine de pages.</p>
         <div className="actions">
           <button type="button" onClick={fermer}>Annuler</button>

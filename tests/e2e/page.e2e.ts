@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import { a4, pagesDe, pdfTemoin } from '../aide/pdfs.js';
+import { pdfChiffre } from '../aide/chiffre.js';
+import { a4, lireStructure, pagesDe, pdfStructure, pdfTemoin } from '../aide/pdfs.js';
+import { texteVu } from '../aide/texte.js';
 import { lireZip, texte } from '../aide/zip.js';
 
 const MOTEURS = { chromium, firefox, webkit };
@@ -34,6 +36,26 @@ async function ouvrirPage(): Promise<{ page: Page; erreurs: string[] }> {
 
 async function deposer(page: Page, fichiers: { name: string; octets: Uint8Array }[]): Promise<void> {
   await page.locator('input[type=file]').setInputFiles(fichiers.map(f => ({ name: f.name, mimeType: 'application/pdf', buffer: Buffer.from(f.octets) })));
+}
+
+
+/** Un scan : du texte dessine dans une image a 300 dpi, legerement penche, enregistre en JPEG, seul dans un PDF. */
+async function pdfScanne(page: Page): Promise<Uint8Array> {
+  const jpeg = await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 2480; c.height = 700;
+    const x = c.getContext('2d');
+    if (x === null) return [];
+    x.fillStyle = 'white'; x.fillRect(0, 0, c.width, c.height);
+    x.rotate(0.6 * Math.PI / 180);
+    x.fillStyle = 'black'; x.font = '46px serif';
+    ['Le conseil municipal s’est réuni le 14 février.', 'Total TTC : 233,88 € pour 12 ramettes.'].forEach((l, i) => x.fillText(l, 180, 220 + i * 92));
+    const b: Blob | null = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.8));
+    return b ? Array.from(new Uint8Array(await b.arrayBuffer())) : [];
+  });
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  const image = await doc.embedJpg(new Uint8Array(jpeg));
+  doc.addPage([595.28, 168]).drawImage(image, { x: 0, y: 0, width: 595.28, height: 168 });
+  return doc.save();
 }
 
 const largeurs = (page: Page) => page.locator('.vignette').evaluateAll(els => els.map(e => (e as HTMLElement).offsetWidth));
@@ -157,22 +179,7 @@ describe('la page', () => {
     const { page, erreurs } = await ouvrirPage();
     const exterieur: string[] = [];
     page.on('request', r => { if (!/^(http:\/\/127\.0\.0\.1:\d+\/|blob:|data:)/.test(r.url())) exterieur.push(r.url()); });
-    // Un scan : du texte dessine dans une image a 300 dpi, legerement penche, enregistre en JPEG, seul dans un PDF.
-    const jpeg = await page.evaluate(async () => {
-      const c = document.createElement('canvas'); c.width = 2480; c.height = 700;
-      const x = c.getContext('2d');
-      if (x === null) return [];
-      x.fillStyle = 'white'; x.fillRect(0, 0, c.width, c.height);
-      x.rotate(0.6 * Math.PI / 180);
-      x.fillStyle = 'black'; x.font = '46px serif';
-      ['Le conseil municipal s’est réuni le 14 février.', 'Total TTC : 233,88 € pour 12 ramettes.'].forEach((l, i) => x.fillText(l, 180, 220 + i * 92));
-      const b: Blob | null = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.8));
-      return b ? Array.from(new Uint8Array(await b.arrayBuffer())) : [];
-    });
-    const doc = await PDFDocument.create({ updateMetadata: false });
-    const image = await doc.embedJpg(new Uint8Array(jpeg));
-    doc.addPage([595.28, 168]).drawImage(image, { x: 0, y: 0, width: 595.28, height: 168 });
-    await deposer(page, [{ name: 'scan.pdf', octets: await doc.save() }]);
+    await deposer(page, [{ name: 'scan.pdf', octets: await pdfScanne(page) }]);
     await expect.poll(() => page.locator('.vignette').count()).toBe(1);
     for (const [format, nom] of [['PowerPoint (.pptx)', 'scan.pptx'], ['Word, texte au fil (.docx)', 'scan.docx']] as const) {
       await page.getByRole('button', { name: 'Convertir…' }).click();
@@ -198,6 +205,110 @@ describe('la page', () => {
     expect(erreurs).toEqual([]);
     await page.close();
   }, 240_000);
+
+  it('duplique, insere une page blanche, numerote, et garde signets et champs', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    await deposer(page, [{ name: 'dossier.pdf', octets: await pdfStructure() }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(4);
+    await page.locator('.vignette').first().click();
+    await page.keyboard.press('Control+d');
+    await expect.poll(() => page.locator('.vignette').count()).toBe(5);
+    await page.getByRole('button', { name: 'Page blanche' }).click();
+    await expect.poll(() => page.locator('.vignette').count()).toBe(6);
+    await expect.poll(() => page.locator('[role=status]').textContent()).toContain('Page blanche insérée en position 2');
+    await page.getByRole('button', { name: 'Numéroter…' }).click();
+    const boite = page.getByRole('dialog');
+    await boite.getByLabel('Format').selectOption('n-sur-total');
+    await boite.getByRole('button', { name: 'Numéroter' }).click();
+    await expect.poll(() => page.locator('.aide').allTextContents()).toContainEqual(expect.stringContaining('« 1 / 6 »'));
+    const telechargement = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Enregistrer le PDF' }).click();
+    const fichier = await telechargement;
+    expect(fichier.suggestedFilename()).toBe('dossier.pdf');
+    const octets = new Uint8Array(readFileSync(await fichier.path()));
+    expect((await pagesDe(octets)).length).toBe(6);
+    const textes = await texteVu(octets);
+    expect(textes.map(p => p.find(t => / \/ 6$/.test(t.str))?.str)).toEqual(['1 / 6', '2 / 6', '3 / 6', '4 / 6', '5 / 6', '6 / 6']);
+    const structure = await lireStructure(octets);
+    expect(structure.signets.map(s => s.titre)).toEqual(['Chapitre 1', 'Chapitre 2']);
+    expect(structure.champs.map(c => c.nom)).toEqual(['nom', 'nom_2', 'visa']);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  });
+
+  it('dit pourquoi un PDF protege ne s ouvre pas', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    await deposer(page, [{ name: 'releve.pdf', octets: pdfChiffre('') }, { name: 'secret.pdf', octets: pdfChiffre('motdepasse') }]);
+    await expect.poll(() => page.locator('[role=status]').textContent()).toContain('son auteur en interdit la modification');
+    expect(await page.locator('[role=status]').textContent()).toContain('« secret.pdf » : ce PDF est protégé par un mot de passe');
+    expect(erreurs).toEqual([]);
+    await page.close();
+  });
+
+  it('demande confirmation avant de quitter une page qui a du travail', async () => {
+    const { page } = await ouvrirPage();
+    // Le navigateur sans tete n'affiche pas la boite de confirmation : on verifie que la page la demande.
+    const retenue = () => page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); dispatchEvent(e); return e.defaultPrevented; });
+    expect(await retenue()).toBe(false);
+    await deposer(page, [{ name: 'a.pdf', octets: await pdfTemoin('A', a4(1)) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(1);
+    expect(await retenue()).toBe(true);
+    await page.close();
+  });
+
+  it('ecrit un PDF cherchable d un scan, et une conversion s arrete quand on le demande', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    await deposer(page, [{ name: 'scan.pdf', octets: await pdfScanne(page) }, { name: 'texte.pdf', octets: await pdfTemoin('Bonjour', a4(1)) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(2);
+    // D'abord, arreter en cours de route : rien ne part.
+    let telechargements = 0;
+    page.on('download', () => { telechargements++; });
+    await page.getByRole('button', { name: 'Convertir…' }).click();
+    await page.getByRole('dialog').getByRole('radio', { name: 'PDF cherchable (.pdf)' }).check();
+    await page.getByRole('dialog').getByRole('button', { name: 'Convertir les 2 pages' }).click();
+    const arreter = page.getByRole('button', { name: 'Arrêter' });
+    await expect.poll(() => arreter.isVisible(), { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.activeElement?.textContent)).toBe('Arrêter');
+    await page.keyboard.press('Escape');
+    await expect.poll(() => page.locator('[role=status]').textContent(), { timeout: 60_000 }).toContain('Conversion arrêtée');
+    expect(telechargements).toBe(0);
+    // Puis jusqu'au bout.
+    await page.getByRole('button', { name: 'Convertir…' }).click();
+    await page.getByRole('dialog').getByRole('radio', { name: 'PDF cherchable (.pdf)' }).check();
+    const telechargement = page.waitForEvent('download', { timeout: 120_000 });
+    await page.getByRole('dialog').getByRole('button', { name: 'Convertir les 2 pages' }).click();
+    const fichier = await telechargement;
+    expect(fichier.suggestedFilename()).toBe('scan-cherchable.pdf');
+    const octets = new Uint8Array(readFileSync(await fichier.path()));
+    expect(await pagesDe(octets)).toEqual([{ largeur: 595.28, hauteur: 168, rotation: 0 }, { largeur: 595, hauteur: 842, rotation: 0 }]);
+    const [scan, texte] = await texteVu(octets);
+    const lu = (scan ?? []).map(t => t.str).join(' ');
+    expect(lu).toContain('conseil municipal');
+    expect(lu).toContain('233,88');
+    // Le texte reconnu tombe sur la ligne du scan : la premiere ligne est dessinee a 220 px de 700, soit a 53 points du haut.
+    const premiere = (scan ?? []).find(t => t.str.includes('conseil'));
+    expect(Math.abs((premiere?.v ?? 0) - 53)).toBeLessThan(6);
+    expect((texte ?? []).map(t => t.str)).toEqual(['Bonjour 1']);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  }, 240_000);
+
+  it('exporte les pages en images', async () => {
+    const { page, erreurs } = await ouvrirPage();
+    await deposer(page, [{ name: 'note.pdf', octets: await pdfTemoin('A', a4(2)) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(2);
+    await page.getByRole('button', { name: 'Convertir…' }).click();
+    await page.getByRole('dialog').getByRole('radio', { name: /Images PNG/ }).check();
+    const telechargement = page.waitForEvent('download');
+    await page.getByRole('dialog').getByRole('button', { name: 'Convertir les 2 pages' }).click();
+    const fichier = await telechargement;
+    expect(fichier.suggestedFilename()).toBe('note-pages.zip');
+    const archive = lireZip(new Uint8Array(readFileSync(await fichier.path())));
+    expect([...archive.keys()]).toEqual(['page-1.png', 'page-2.png']);
+    expect([...(archive.get('page-1.png') ?? new Uint8Array()).subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  });
 
   it('dans un artefact, enregistre par l hote, qui demande confirmation', async () => {
     const page = await navigateur.newPage({ acceptDownloads: true });
@@ -245,6 +356,14 @@ describe('la page', () => {
     await deposer(page, [{ name: 'a.pdf', octets: await pdfTemoin('A', a4(3)) }]);
     await expect.poll(() => page.locator('.vignette').count()).toBe(3);
     expect(await auditer()).toEqual([]);
+    // Les boites de numerotation et de conversion, ouvertes.
+    for (const bouton of ['Numéroter…', 'Convertir…']) {
+      await page.getByRole('button', { name: bouton }).click();
+      await expect.poll(() => page.getByRole('dialog').count()).toBe(1);
+      expect(await auditer(), bouton).toEqual([]);
+      await page.keyboard.press('Escape');
+      await expect.poll(() => page.getByRole('dialog').count()).toBe(0);
+    }
     await page.close();
   });
 });

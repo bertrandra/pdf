@@ -11,6 +11,7 @@ import { Apercu } from './Apercu.js';
 import { Grille } from './Grille.js';
 import { Attente } from './Attente.js';
 import { Convertir } from './Convertir.js';
+import { Numeroter, direNumerotation } from './Numeroter.js';
 import { Scinder } from './Scinder.js';
 
 function ChoisirPages({ atelier }: { atelier: Atelier }) {
@@ -46,7 +47,7 @@ function Zoom({ atelier }: { atelier: Atelier }) {
   );
 }
 
-function Barre({ atelier, ajouter, scinder, convertir }: { atelier: Atelier; ajouter: () => void; scinder: () => void; convertir: () => void }) {
+function Barre({ atelier, ajouter, scinder, convertir, numeroter }: { atelier: Atelier; ajouter: () => void; scinder: () => void; convertir: () => void; numeroter: () => void }) {
   const { montage, selection, occupe } = atelier;
   const vide = montage.pages.length === 0, aucune = selection.ids.size === 0;
   const n = selection.ids.size;
@@ -61,6 +62,7 @@ function Barre({ atelier, ajouter, scinder, convertir }: { atelier: Atelier; ajo
         <button type="button" disabled={aucune} onClick={() => atelier.pivoter(selection.ids, -1)} title="Tourner à gauche (Maj+R)" aria-label="Tourner à gauche">↺</button>
         <button type="button" disabled={aucune} onClick={() => atelier.pivoter(selection.ids, 1)} title="Tourner à droite (R)" aria-label="Tourner à droite">↻</button>
         <button type="button" disabled={n < 2} onClick={() => atelier.inverser(selection.ids)}>Inverser l’ordre</button>
+        <button type="button" disabled={aucune} onClick={() => atelier.dupliquer(selection.ids)} title="Dupliquer (Ctrl+D)">Dupliquer</button>
         <button type="button" disabled={aucune} onClick={() => atelier.garder(selection.ids)} title="Ne garder que les pages choisies">Découper</button>
         <button type="button" disabled={aucune} onClick={() => void atelier.enregistrer({ ...montage, pages: montage.pages.filter(p => selection.ids.has(p.id)) }, nomDeSortie(montage).replace(/\.pdf$/i, '') + '-extrait.pdf')}>Extraire…</button>
         <button type="button" className="destructif" disabled={aucune} onClick={() => atelier.retirer(selection.ids)} title="Supprimer (Suppr)">Supprimer</button>
@@ -69,8 +71,11 @@ function Barre({ atelier, ajouter, scinder, convertir }: { atelier: Atelier; ajo
       <div className="pousse" />
       {vide ? null : <Zoom atelier={atelier} />}
       <div className="groupe">
+        <button type="button" disabled={vide || occupe} onClick={() => void atelier.insererPageBlanche(selection.ids)}
+          title={aucune ? 'Ajouter une page blanche à la fin' : 'Insérer une page blanche après les pages choisies'}>Page blanche</button>
+        <button type="button" disabled={vide || occupe} onClick={numeroter} aria-pressed={montage.numerotation !== undefined}>Numéroter…</button>
         <button type="button" disabled={vide || occupe} onClick={scinder}>Scinder…</button>
-        <button type="button" disabled={vide || occupe} onClick={convertir} title="En PowerPoint ou en Word">Convertir…</button>
+        <button type="button" disabled={vide || occupe} onClick={convertir} title="En PowerPoint, en Word, en PDF cherchable ou en images">Convertir…</button>
         <button type="button" className="primaire" disabled={vide || occupe} onClick={() => void atelier.enregistrer(montage, nomDeSortie(montage))}>Enregistrer le PDF</button>
       </div>
     </header>
@@ -84,6 +89,16 @@ export function Application() {
   const [apercu, setApercu] = useState<string | null>(null);
   const [scission, setScission] = useState(false);
   const [conversion, setConversion] = useState(false);
+  const [numerotation, setNumerotation] = useState(false);
+  const aDuTravail = montage.pages.length > 0;
+
+  // Fermer l'onglet ou le recharger perdrait le travail en cours : le navigateur demande d'abord confirmation.
+  useEffect(() => {
+    if (!aDuTravail) return;
+    const retenir = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    addEventListener('beforeunload', retenir);
+    return () => removeEventListener('beforeunload', retenir);
+  }, [aDuTravail]);
   const [survol, setSurvol] = useState(false);
 
   // Ctrl+Z et Ctrl+Maj+Z (ou Ctrl+Y) partout, sauf dans un champ ou ils defont la saisie.
@@ -109,7 +124,7 @@ export function Application() {
     <div className="application">
       <input ref={choix} type="file" accept="application/pdf,.pdf" multiple hidden
         onChange={e => { const f = [...(e.target.files ?? [])]; e.target.value = ''; void atelier.ajouterFichiers(f); }} />
-      <Barre atelier={atelier} ajouter={() => choix.current?.click()} scinder={() => setScission(true)} convertir={() => setConversion(true)} />
+      <Barre atelier={atelier} ajouter={() => choix.current?.click()} scinder={() => setScission(true)} convertir={() => setConversion(true)} numeroter={() => setNumerotation(true)} />
       <p className="etat" role="status" aria-live="polite">
         {message ? <span className={'message ' + message.type}>{message.texte}</span> : null}
         {atelier.travail !== null ? <span className="discret-texte"> {atelier.travail}</span> : null}
@@ -131,12 +146,15 @@ export function Application() {
             Clic, Maj+clic, Ctrl+clic pour choisir ; glisser ou Alt+flèches pour ranger ; double clic ou Entrée pour voir en grand ; Ctrl+molette pour zoomer.
             Déposez d’autres PDF sur la grille pour les insérer.
           </p>
+          {montage.numerotation !== undefined ? <p className="aide discret-texte">{direNumerotation(montage.numerotation, montage.pages.length)} Ils s’écrivent à l’enregistrement.</p> : null}
         </main>
       )}
-      <Attente travail={atelier.travail} />
+      <Attente travail={atelier.travail} arreter={atelier.arretable ? atelier.interrompre : null} />
       {apercu !== null ? <Apercu montage={montage} id={apercu} changer={setApercu} fermer={fermerApercu} /> : null}
       {scission ? <Scinder total={montage.pages.length} nom={nomDeSortie(montage)} fermer={() => setScission(false)}
         enregistrer={r => { setScission(false); void atelier.enregistrerScission(r); }} /> : null}
+      {numerotation ? <Numeroter actuelle={montage.numerotation} total={montage.pages.length} fermer={() => setNumerotation(false)}
+        appliquer={n => { setNumerotation(false); atelier.numeroter(n); }} /> : null}
       {conversion ? <Convertir total={montage.pages.length} choisies={atelier.selection.ids.size} fermer={() => setConversion(false)}
         convertir={(format, seules, ocr) => { setConversion(false); void atelier.convertirEn(format, seules, ocr); }} /> : null}
     </div>

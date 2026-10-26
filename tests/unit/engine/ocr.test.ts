@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { boitesOcr, effacerLignes, ligneSure, lignesOcrPosees, paragraphesOcr, type LigneOcr, type MotOcr } from '../../../src/engine/ocr.js';
+import { boitesOcr, effacerLignes, ligneSure, lignesDeCouche, lignesOcrPosees, paragraphesOcr, type LigneOcr, type MotOcr } from '../../../src/engine/ocr.js';
 
 /** Un mot de 10 px de haut sur la ligne de base y = 100, de `x` a `x + 10 * longueur`. */
 const mot = (texte: string, x: number, confiance = 90): MotOcr => ({ texte, confiance, boite: { x0: x, y0: 90, x1: x + 10 * texte.length, y1: 100 } });
@@ -82,5 +82,18 @@ describe('effacerLignes', () => {
     const img = image();
     expect(effacerLignes(img, [{ x0: 0, y0: 0, x1: 3, y1: 2 }], 0)).toEqual([null]);
     expect(effacerLignes(img, [{ x0: -50, y0: -50, x1: -40, y1: -40 }])).toEqual([null]);
+  });
+});
+
+describe('lignesDeCouche', () => {
+  it('tient chaque cellule sure par sa ligne de base, avec son texte et sa largeur', () => {
+    const lignes = lignesDeCouche([{ lignes: [ligne([mot('Total', 0), mot('TTC', 60)]), ligne([mot('~~', 0, 10)])] }], 0.5);
+    const posees = lignesOcrPosees([{ lignes: [ligne([mot('Total', 0), mot('TTC', 60)])] }], 0.5);
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0]?.texte).toBe('Total TTC');
+    expect(lignes[0]?.u).toBe(posees[0]?.x);
+    expect(lignes[0]?.largeur).toBe(posees[0]?.largeur);
+    // La ligne de base est sous le haut de la boite, de l'ascendante de la police.
+    expect((lignes[0]?.v ?? 0) - (posees[0]?.haut ?? 0)).toBeCloseTo(0.9 * (posees[0]?.taille ?? 0));
   });
 });

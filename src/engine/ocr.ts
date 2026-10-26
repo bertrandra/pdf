@@ -83,6 +83,19 @@ export function lignesOcrPosees(paragraphes: readonly ParagrapheOcr[], pointsPar
   });
 }
 
+/** Une ligne de la couche de texte d'un scan : son texte, le depart de sa ligne de base (u, v), sa taille, sa pente, sa largeur. */
+export interface LigneDeCouche { readonly texte: string; readonly u: number; readonly v: number; readonly taille: number; readonly angle: number; readonly largeur: number }
+
+/**
+ * La couche de texte invisible d'un scan (un PDF ou l'on peut chercher) : les memes lignes sures que
+ * `lignesOcrPosees`, une par cellule, mais tenues par leur ligne de base, que le texte invisible doit suivre.
+ */
+export function lignesDeCouche(paragraphes: readonly ParagrapheOcr[], pointsParPixel: number, seuil = SEUIL_CONFIANCE): LigneDeCouche[] {
+  return lignesOcrPosees(paragraphes, pointsParPixel, seuil).map(l => ({
+    texte: l.segments.map(s => s.texte).join(''), u: l.x, v: l.haut + ASCENDANTE * l.taille, taille: l.taille, angle: l.angle, largeur: l.largeur
+  }));
+}
+
 /** Les boites a effacer de l'image, dans l'ordre de `lignesOcrPosees` : une par cellule des lignes sures. */
 export function boitesOcr(paragraphes: readonly ParagrapheOcr[], seuil = SEUIL_CONFIANCE): BoiteOcr[] {
   return paragraphes.flatMap(p => p.lignes).filter(l => ligneSure(l, seuil)).flatMap(l => cellules(l).flatMap(mots => {

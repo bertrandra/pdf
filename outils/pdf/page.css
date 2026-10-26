@@ -19,7 +19,7 @@ button.primaire { background: var(--cyan); color: var(--sur-cyan); border-color:
 button.primaire:hover:not(:disabled) { background: var(--cyan-fonce); border-color: var(--cyan-fonce); }
 button.destructif { color: var(--echec); }
 @media (pointer: coarse) { button { min-height: 40px; min-width: 40px; } }
-input, textarea { font: inherit; color: var(--encre); background: var(--panneau); border: 1px solid var(--filet-fort); border-radius: var(--rayon-champ); padding: var(--esp-xs) var(--esp-m); }
+input, textarea, select { font: inherit; color: var(--encre); background: var(--panneau); border: 1px solid var(--filet-fort); border-radius: var(--rayon-champ); padding: var(--esp-xs) var(--esp-m); }
 input[aria-invalid="true"] { border-color: var(--echec); }
 input[type="range"] { accent-color: var(--cyan); padding: 0; border: 0; background: transparent; }
 input[type="radio"] { accent-color: var(--cyan); }
