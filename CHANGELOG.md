@@ -13,6 +13,9 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 
 ### Ajouté
 
+- Une roue d’attente au milieu de l’écran pendant un travail long (lecture, écriture, conversion, OCR) : elle dit
+  ce qui se fait, page par page, et la page ne se modifie pas pendant ce temps. Immobile avec « réduire les animations ».
+
 - La page se publie comme artefact claude.ai (`npm run artefact`) : l’enregistrement passe alors par l’hôte, qui
   demande confirmation, et « Enregistrement annulé. » le dit si la personne refuse.
 
