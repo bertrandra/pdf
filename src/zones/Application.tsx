@@ -90,15 +90,15 @@ export function Application() {
   const [scission, setScission] = useState(false);
   const [conversion, setConversion] = useState(false);
   const [numerotation, setNumerotation] = useState(false);
-  const occupee = montage.pages.length > 0;
+  const aDuTravail = montage.pages.length > 0;
 
   // Fermer l'onglet ou le recharger perdrait le travail en cours : le navigateur demande d'abord confirmation.
   useEffect(() => {
-    if (!occupee) return;
+    if (!aDuTravail) return;
     const retenir = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     addEventListener('beforeunload', retenir);
     return () => removeEventListener('beforeunload', retenir);
-  }, [occupee]);
+  }, [aDuTravail]);
   const [survol, setSurvol] = useState(false);
 
   // Ctrl+Z et Ctrl+Maj+Z (ou Ctrl+Y) partout, sauf dans un champ ou ils defont la saisie.
