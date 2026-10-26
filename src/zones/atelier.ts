@@ -8,7 +8,7 @@ import {
 } from '../engine/montage.js';
 import { SELECTION_VIDE, type Selection } from '../engine/selection.js';
 import { PALIER_DEFAUT } from '../engine/zoom.js';
-import { assembler } from '../export/assemblage.js';
+import { assembler, assemblerPrepare, preparer } from '../export/assemblage.js';
 import { ecrireZip } from '../export/zip.js';
 import { declarerSource, oublierSource } from '../io/apercu.js';
 import { fichierPdf, lirePdf } from '../io/lecture.js';
@@ -108,8 +108,11 @@ export function useAtelier() {
     const noms = nomsDesParties(base, parties.length);
     setTravail('Écriture des fichiers…');
     try {
+      // Les sources se chargent une fois pour toutes les parties : scinder trois cents pages une a une ne relit pas
+      // trois cents fois le fichier.
+      const preparees = await preparer(montage, octets.current);
       const fichiers = [];
-      for (const [k, p] of parties.entries()) fichiers.push({ nom: noms[k] ?? 'partie.pdf', donnees: await assembler(p, octets.current) });
+      for (const [k, p] of parties.entries()) fichiers.push({ nom: noms[k] ?? 'partie.pdf', donnees: await assemblerPrepare(p, preparees) });
       const seul = fichiers[0];
       const remise = fichiers.length === 1 && seul !== undefined
         ? await telecharger(seul.donnees, seul.nom, 'application/pdf')
