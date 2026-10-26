@@ -194,6 +194,38 @@ describe('la page', () => {
     await page.close();
   }, 240_000);
 
+  it('dans un artefact, enregistre par l hote, qui demande confirmation', async () => {
+    const page = await navigateur.newPage({ acceptDownloads: true });
+    const erreurs: string[] = [];
+    page.on('pageerror', e => erreurs.push(e.message));
+    // Un hote claude.ai simule : la capacite `downloads` garde ce qu'on lui confie, et refuse le second envoi.
+    await page.addInitScript(() => {
+      const recus: { filename: string; taille: number }[] = [];
+      let appels = 0;
+      const save = async (r: { filename: string; data: Blob }) => {
+        appels++;
+        if (appels > 1) throw Object.assign(new Error('non'), { code: 'declined' });
+        recus.push({ filename: r.filename, taille: r.data.size });
+        return { status: 'saved' };
+      };
+      Object.assign(window, { claude: { use: async (nom: string) => (nom === 'downloads' ? { save } : null) }, recus });
+    });
+    let telechargements = 0;
+    page.on('download', () => { telechargements++; });
+    await page.goto('http://127.0.0.1:' + PORT + '/pdf.html');
+    await deposer(page, [{ name: 'note.pdf', octets: await pdfTemoin('A', a4(2)) }]);
+    await expect.poll(() => page.locator('.vignette').count()).toBe(2);
+    await page.getByRole('button', { name: 'Enregistrer le PDF' }).click();
+    await expect.poll(() => page.locator('[role=status]').textContent()).toContain('« note.pdf » enregistré');
+    expect(await page.evaluate(() => (window as unknown as { recus: unknown[] }).recus)).toEqual([{ filename: 'note.pdf', taille: expect.any(Number) }]);
+    await page.getByRole('button', { name: 'Enregistrer le PDF' }).click();
+    await expect.poll(() => page.locator('[role=status]').textContent()).toContain('Enregistrement annulé.');
+    // L'hote a tout recu : la page n'a lance aucun telechargement elle-meme.
+    expect(telechargements).toBe(0);
+    expect(erreurs).toEqual([]);
+    await page.close();
+  });
+
   it('n a aucune violation d accessibilite grave', async () => {
     const { page } = await ouvrirPage();
     const axe = readFileSync(join(__dirname, '../../node_modules/axe-core/axe.min.js'), 'utf8');

@@ -7,7 +7,7 @@
 //
 //   npm run construire   -> dist/pdf.html, dist/pdfjs/pdf.min.mjs, dist/pdfjs/pdf.worker.min.mjs, dist/ocr/
 
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { annoncer, depuisRacine, ecrireDansDist, empaqueter, enKo, refuserFinDeScript } from './aide.mjs';
 import { copierModeles } from './modeles-ocr.mjs';
 
@@ -51,9 +51,16 @@ annoncer('pdf.js recopié', 'pdfjs/', 'version ' + version);
 const tesseract = depuisRacine('node_modules/tesseract.js');
 const coeur = depuisRacine('node_modules/tesseract.js/node_modules/tesseract.js-core');
 mkdirSync(depuisRacine('dist/ocr'), { recursive: true });
-for (const [dossier, f] of [[tesseract + '/dist', 'tesseract.min.js'], [tesseract + '/dist', 'worker.min.js'], [coeur, 'tesseract-core-lstm.wasm.js']]) {
+for (const [dossier, f] of [[tesseract + '/dist', 'tesseract.min.js'], [coeur, 'tesseract-core-lstm.wasm.js']]) {
   copyFileSync(dossier + '/' + f, depuisRacine('dist/ocr', f));
 }
+// Une correction du travailleur de tesseract.js 7.0.0 : donne en octets ({ code, data }, src/io/ocr.ts), un modele
+// est bien ecrit sous son code, mais l'initialisation lit `data` ou il faut `code` et n'aboutit jamais. Le motif doit
+// se trouver une fois et une seule : une autre version de tesseract.js fait echouer la construction, et l'on regarde.
+const travailleur = readFileSync(tesseract + '/dist/worker.min.js', 'utf8');
+const FAUTE = 'return"string"==typeof t?t:t.data})).join("+")';
+if (travailleur.split(FAUTE).length !== 2) throw new Error('worker.min.js de tesseract.js a changé : revoir la correction de l’initialisation (scripts/construire.mjs).');
+writeFileSync(depuisRacine('dist/ocr/worker.min.js'), travailleur.replace(FAUTE, 'return"string"==typeof t?t:t.code})).join("+")'));
 const versionOcr = JSON.parse(readFileSync(tesseract + '/package.json', 'utf8')).version;
 annoncer('tesseract.js recopié', 'ocr/', 'version ' + versionOcr);
 await copierModeles();
