@@ -82,7 +82,8 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   `ACTUALISER_REFERENCES=1 npx vitest run tests/unit/styles`. Pas de `color-mix()` : une teinte mélangée est un jeton.
 - **Une action primaire par écran** : un bouton est secondaire par défaut, seul `.primaire` est plein
   (« Enregistrer le PDF », ou celle de la boîte ouverte). 40 px au doigt, `prefers-reduced-motion` respecté.
-- **Rien ne quitte l'ordinateur** : les fichiers sont lus et écrits dans la page, aucun `fetch` dans `src/`.
+- **Rien ne quitte l'ordinateur** : les fichiers sont lus et écrits dans la page ; aucune requête hors des fichiers
+  servis avec elle (un test de navigateur le vérifie). Le seul `fetch` de `src/` lit les modèles OCR (`io/ocr.ts`).
   Un PDF illisible, chiffré ou qui n'en est pas un est refusé en le nommant, sans lever (`io/lecture.ts`).
 - **La page se pilote sans souris** : la grille est une `listbox` à une seule tabulation (flèches, Maj, Espace,
   Ctrl+A, Alt+flèches pour ranger, R pour tourner, Suppr, Entrée pour l'aperçu, + et − pour zoomer) ; une seule

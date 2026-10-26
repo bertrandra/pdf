@@ -9,9 +9,10 @@
 //
 //   npm run artefact   -> dist/artefact/ (index.html, pdfjs/, ocr/)
 
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { annoncer, depuisRacine, ecrireDansDist, enKo } from './aide.mjs';
+import { LANGUES } from './modeles-ocr.mjs';
 
 /** Le nom de l'outil dans la galerie et l'onglet : un nom, pas une explication. */
 export const TITRE_ARTEFACT = 'Atelier PDF';
@@ -31,8 +32,24 @@ annoncer('Page d’artefact', 'artefact/index.html', enKo(artefact.length) + ' K
 
 // Les fichiers charges a la demande : les scripts nettoyes, les modeles (binaires, compresses) tels quels.
 const scripts = ['pdfjs/pdf.min.mjs', 'pdfjs/pdf.worker.min.mjs', 'ocr/tesseract.min.js', 'ocr/worker.min.js', 'ocr/tesseract-core-lstm.wasm.js'];
-const binaires = ['ocr/langues/fra.traineddata.gz', 'ocr/langues/eng.traineddata.gz'];
-for (const f of [...scripts, ...binaires]) mkdirSync(dirname(depuisRacine('dist/artefact', f)), { recursive: true });
-for (const f of scripts) writeFileSync(depuisRacine('dist/artefact', f), sansControles(readFileSync(depuisRacine('dist', f), 'utf8')));
-for (const f of binaires) copyFileSync(depuisRacine('dist', f), depuisRacine('dist/artefact', f));
-annoncer('Fichiers de l’artefact', 'artefact/', scripts.length + ' scripts, ' + binaires.length + ' modèles');
+for (const f of scripts) {
+  mkdirSync(dirname(depuisRacine('dist/artefact', f)), { recursive: true });
+  writeFileSync(depuisRacine('dist/artefact', f), sansControles(readFileSync(depuisRacine('dist', f), 'utf8')));
+}
+// Les modeles : un artefact ne sert pas de .gz, et un fichier texte y pese 16 Mo au plus. Chaque modele compresse
+// s'ecrit en base64, coupe en morceaux de 8 Mo de texte, avec le manifeste que lit src/io/ocr.ts.
+const MORCEAU = 8 * 1024 * 1024;
+mkdirSync(depuisRacine('dist/artefact/ocr/langues'), { recursive: true });
+let morceaux = 0;
+for (const langue of LANGUES) {
+  const texte = readFileSync(depuisRacine('dist/ocr/langues', langue + '.traineddata.gz')).toString('base64');
+  const parties = [];
+  for (let i = 0; i * MORCEAU < texte.length; i++) {
+    const nom = langue + '-' + (i + 1) + '.txt';
+    writeFileSync(depuisRacine('dist/artefact/ocr/langues', nom), texte.slice(i * MORCEAU, (i + 1) * MORCEAU));
+    parties.push(nom);
+  }
+  writeFileSync(depuisRacine('dist/artefact/ocr/langues', langue + '.json'), JSON.stringify({ codage: 'base64-gzip', parties }));
+  morceaux += parties.length;
+}
+annoncer('Fichiers de l’artefact', 'artefact/', scripts.length + ' scripts, ' + LANGUES.length + ' modèles en ' + morceaux + ' morceaux de texte');

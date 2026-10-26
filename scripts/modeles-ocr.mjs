@@ -9,7 +9,11 @@
 // anglais (15,4 Mo) passe sous les 15 Mo par fichier d'un artefact. La compression est reproductible : zlib ecrit
 // une date nulle dans l'en-tete gzip, donc les memes modeles rendent les memes octets.
 //
-//   node scripts/modeles-ocr.mjs   -> dist/ocr/langues/{fra,eng}.traineddata.gz
+// Chaque modele a son manifeste (`<langue>.json`, lu par src/io/ocr.ts) : ici, un seul fichier gzip. Un artefact
+// claude.ai ne sert pas de fichier .gz : scripts/artefact.mjs y ecrit le meme modele en morceaux de texte base64,
+// avec un manifeste qui le dit, et la page n'a rien d'autre a savoir.
+//
+//   node scripts/modeles-ocr.mjs   -> dist/ocr/langues/{fra,eng}.traineddata.gz et {fra,eng}.json
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -39,6 +43,9 @@ async function modele(m) {
 }
 
 /** Ecrit les modeles, compresses, dans dist/ocr/langues/. */
+/** Les langues du registre, dans l'ordre. */
+export const LANGUES = registre.modeles.map(m => m.langue);
+
 export async function copierModeles() {
   mkdirSync(depuisRacine('dist/ocr/langues'), { recursive: true });
   let total = 0;
@@ -46,6 +53,7 @@ export async function copierModeles() {
     const octets = await modele(m);
     const compresse = gzipSync(octets, { level: constants.Z_BEST_COMPRESSION });
     writeFileSync(depuisRacine('dist/ocr/langues', m.langue + '.traineddata.gz'), compresse);
+    writeFileSync(depuisRacine('dist/ocr/langues', m.langue + '.json'), JSON.stringify({ codage: 'gzip', parties: [m.langue + '.traineddata.gz'] }));
     total += compresse.length;
   }
   annoncer('Modèles OCR vérifiés', 'ocr/langues/', registre.modeles.map(m => m.langue).join(', ') + ', tessdata_best ' + registre.etiquette + ', ' + enKo(total) + ' Ko compressés');

@@ -25,7 +25,7 @@ interface Travailleur {
   setParameters(p: Record<string, string>): Promise<unknown>;
   terminate(): Promise<unknown>;
 }
-interface TesseractGlobal { createWorker(langues: readonly string[], oem: number, options: object): Promise<Travailleur> }
+interface TesseractGlobal { createWorker(langues: readonly { code: string; data: unknown }[], oem: number, options: object): Promise<Travailleur> }
 
 let chargement: Promise<TesseractGlobal> | null = null;
 
@@ -57,17 +57,49 @@ export interface Reconnaisseur {
   fermer(): Promise<void>;
 }
 
+/**
+ * Le manifeste d'un modele (`ocr/langues/<langue>.json`, ecrit par scripts/modeles-ocr.mjs) : ses parties, dans
+ * l'ordre, et leur codage. `gzip` : un seul fichier binaire compresse ; `base64-gzip` : le meme, ecrit en base64 et
+ * coupe en morceaux de texte, la seule forme qu'un artefact claude.ai serve pour un fichier de cette taille.
+ */
+interface Manifeste { readonly codage: 'gzip' | 'base64-gzip'; readonly parties: readonly string[] }
+
+/** Le base64 en octets, sans passer par une chaine de plusieurs millions de caracteres par octet decode. */
+function depuisBase64(texte: string): Uint8Array {
+  const binaire = atob(texte.replace(/\s+/g, ''));
+  const octets = new Uint8Array(binaire.length);
+  for (let i = 0; i < binaire.length; i++) octets[i] = binaire.charCodeAt(i);
+  return octets;
+}
+
+/**
+ * Les octets du modele d'une langue, compresses (tesseract.js reconnait le gzip et le decompresse). C'est le seul
+ * `fetch` de src/ : il ne lit que des fichiers servis avec la page, dans `ocr/langues/`.
+ */
+async function modele(base: string, langue: string): Promise<Uint8Array> {
+  const lire = async (nom: string) => {
+    const r = await fetch(base + 'langues/' + nom);
+    if (!r.ok) throw new Error('Le modèle de reconnaissance « ' + langue + ' » est absent de cette page (' + r.status + ').');
+    return r;
+  };
+  const manifeste = await (await lire(langue + '.json')).json() as Manifeste;
+  if (manifeste.codage === 'gzip') return new Uint8Array(await (await lire(manifeste.parties[0] ?? '')).arrayBuffer());
+  const morceaux = await Promise.all(manifeste.parties.map(async p => depuisBase64(await (await lire(p)).text())));
+  const total = new Uint8Array(morceaux.reduce((n, m) => n + m.length, 0));
+  let pos = 0;
+  for (const m of morceaux) { total.set(m, pos); pos += m.length; }
+  return total;
+}
+
 /** Demarre Tesseract (le premier appel charge environ 20 Mo : le coeur et les deux modeles compresses). */
 export async function ouvrirReconnaisseur(): Promise<Reconnaisseur> {
   const base = new URL(DOSSIER_OCR, document.baseURI).href;
-  const t = await tesseract(base);
-  // OEM 1 : le reseau LSTM seul (les modeles « best » n'ont pas l'ancien moteur).
-  const travailleur = await t.createWorker([...LANGUES_OCR], 1, {
+  const [t, ...donnees] = await Promise.all([tesseract(base), ...LANGUES_OCR.map(l => modele(base, l))]);
+  // OEM 1 : le reseau LSTM seul (les modeles « best » n'ont pas l'ancien moteur). Les modeles sont donnes en octets :
+  // tesseract.js ne va rien chercher lui-meme.
+  const travailleur = await t.createWorker(LANGUES_OCR.map((code, i) => ({ code, data: donnees[i] })), 1, {
     workerPath: base + 'worker.min.js',
     corePath: base + 'tesseract-core-lstm.wasm.js',
-    langPath: base + 'langues',
-    // Les modeles sont servis compresses (scripts/modeles-ocr.mjs) : tesseract.js les decompresse.
-    gzip: true,
     cacheMethod: 'none',
     workerBlobURL: false
   });
