@@ -139,7 +139,6 @@ service en ligne, mais peut copier un dossier sur son intranet. Aucun concurrent
   constructions : `pdf.html` et `pdf-premium.html`, et les modèles OCR seulement dans la seconde), ce qui allège aussi
   la page gratuite.
 - **La licence du dépôt** (`UNLICENSED`, dépôt privé) est à trancher avant toute distribution payante.
-- La décision mérite un ADR (ADR-0008) : la frontière gratuit/premium, la forme de la clé, les deux constructions.
 - La frontière entre les offres, la forme de la clé et les constructions séparées méritent un ADR (ADR-0008) ; chaque
   horizon aussi, au moment de s'y engager (signature, Factur-X, IA locale : un ADR chacun, mesuré comme l'ADR-0007).
 
