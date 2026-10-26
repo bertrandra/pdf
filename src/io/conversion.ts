@@ -1,13 +1,14 @@
-// La conversion d'un montage en PowerPoint ou en Word (ADR-0005) : io dessine chaque page (pdf.js) ou en lit le
-// texte, l'ecriture pure (export/pptx.ts, export/docx.ts) en fait le fichier. Les pages se traitent une a une, dans
-// l'ordre, et chacune est annoncee : une conversion de deux cents pages prend une minute, il faut voir qu'elle avance.
+// La conversion d'un montage en PowerPoint ou en Word (ADR-0005, ADR-0006) : io dessine le fond de chaque page et en
+// pose le texte (pdf.js), ou en lit le texte au fil ; l'ecriture pure (export/pptx.ts, export/docx.ts) en fait le
+// fichier. Les pages se traitent une a une, dans l'ordre, et chacune est annoncee : une conversion de deux cents
+// pages prend une minute, il faut voir qu'elle avance.
 
 import { paragraphes } from '../engine/texte.js';
 import { ecrireDocxFidele, ecrireDocxTexte } from '../export/docx.js';
 import type { PageImage } from '../export/ooxml.js';
 import { ecrirePptx } from '../export/pptx.js';
 import { pageSource, tailleVue, type Montage, type PageMontee } from '../model/montage.js';
-import { imageDePage, texteDePage } from './apercu.js';
+import { pageModifiable, texteDePage } from './apercu.js';
 
 export type FormatConversion = 'pptx' | 'docx-fidele' | 'docx-texte';
 
@@ -49,7 +50,8 @@ export async function convertir(m: Montage, format: FormatConversion, progressio
   const images: PageImage[] = [];
   for (const [i, p] of m.pages.entries()) {
     const t = taille(m, p);
-    images.push({ ...t, format: 'jpeg', image: await imageDePage(p.source, p.index, p.rotation, largeurDImage(t.largeur, t.hauteur), 'jpeg') });
+    // Le fond sans le texte, et le texte pose dessus en zones modifiables (ADR-0006).
+    images.push({ ...t, format: 'jpeg', ...await pageModifiable(p.source, p.index, p.rotation, largeurDImage(t.largeur, t.hauteur), 'jpeg') });
     progression(i + 1, total);
   }
   return format === 'pptx' ? ecrirePptx(images) : ecrireDocxFidele(images);

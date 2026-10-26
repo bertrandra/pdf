@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormatConversion } from '../io/conversion.js';
 
 const CHOIX: ReadonlyArray<{ format: FormatConversion; titre: string; detail: string }> = [
-  { format: 'pptx', titre: 'PowerPoint (.pptx)', detail: 'Une diapositive par page, la page en image : rien ne bouge, le texte ne se modifie pas.' },
-  { format: 'docx-fidele', titre: 'Word, mise en page fidèle (.docx)', detail: 'Une page Word par page, à la même taille, la page en image : rien ne bouge, le texte ne se modifie pas.' },
-  { format: 'docx-texte', titre: 'Word, texte modifiable (.docx)', detail: 'Le texte des pages en paragraphes, à retoucher librement ; la mise en page, les images et les tableaux sont perdus, et une page scannée reste vide.' }
+  { format: 'pptx', titre: 'PowerPoint (.pptx)', detail: 'Une diapositive par page : le texte reste modifiable, chaque ligne à sa place, sur le fond de la page.' },
+  { format: 'docx-fidele', titre: 'Word, mise en page conservée (.docx)', detail: 'Une page Word par page, à la même taille : le texte reste modifiable, chaque ligne à sa place, sur le fond de la page.' },
+  { format: 'docx-texte', titre: 'Word, texte au fil (.docx)', detail: 'Le texte en paragraphes qui se suivent, facile à réécrire ; la mise en page, les images et les tableaux sont perdus.' }
 ];
 
 export function Convertir({ total, choisies, convertir, fermer }: {
@@ -40,6 +40,8 @@ export function Convertir({ total, choisies, convertir, fermer }: {
             <label><input type="radio" name="pages-conversion" checked={seulementChoisies} onChange={() => setSeulementChoisies(true)} /> Les pages choisies ({choisies})</label>
           </fieldset>
         ) : null}
+        <p className="discret-texte">Le texte garde sa police si elle est installée sur l’ordinateur qui ouvre le fichier, une police proche sinon.
+          Une page scannée n’a pas de texte : elle reste une image.</p>
         <p className="discret-texte">La conversion se fait dans cette page : rien n’est envoyé. Comptez quelques secondes par dizaine de pages.</p>
         <div className="actions">
           <button type="button" onClick={fermer}>Annuler</button>

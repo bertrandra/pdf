@@ -1,13 +1,13 @@
-// La conversion en PowerPoint (ADR-0005) : une diapositive par page, la page en image, centree et entiere. Le
-// texte n'est pas repris en zones modifiables : une page de PDF n'a ni titre ni corps, et la redecouper en
-// zones de texte la defigurerait. Le fichier est le plus petit que PowerPoint, LibreOffice et Keynote ouvrent sans
+// La conversion en PowerPoint (ADR-0005, ADR-0006) : une diapositive par page, entiere et centree. Le fond est la page
+// dessinee sans son texte ; chaque ligne de texte s'y pose en zone modifiable, a sa place, avec sa police, sa taille,
+// son gras, son italique et sa couleur. Une page sans texte lisible (un scan) reste une image. Le fichier est le plus petit que PowerPoint, LibreOffice et Keynote ouvrent sans
 // le reparer : un masque, une disposition vide, un theme, et les diapositives.
 //
 // Une presentation n'a qu'une taille de diapositive : celle de la premiere page, bornee a ce que PowerPoint admet
 // (de 1 a 56 pouces). Une page d'une autre taille s'y pose entiere, centree, sans deformation.
 
 import { au } from '../util/tableaux.js';
-import { bornerTaille, emu, ENTETE, NS_A, NS_REL_DOC, paquet, relations, typesDeContenu, type PageImage } from './ooxml.js';
+import { bornerTaille, echapper, emu, ENTETE, NS_A, NS_REL_DOC, paquet, relations, typesDeContenu, type LigneColoree, type PageImage } from './ooxml.js';
 
 const NS_P = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 const ESPACES = 'xmlns:a="' + NS_A + '" xmlns:r="' + NS_REL_DOC + '" xmlns:p="' + NS_P + '"';
@@ -50,6 +50,26 @@ function disposition(): string {
     + '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>';
 }
 
+/**
+ * Une ligne de texte en zone modifiable, a sa place sur la page mise a l'echelle `k` et decalee de (dx, dy) : sans
+ * marge interieure, sans retour a la ligne ni ajustement automatique, pour que la ligne de base tombe ou elle etait.
+ * Un texte invisible (la couche OCR d'un scan) reste selectionnable et modifiable, mais transparent.
+ */
+function zoneDeTexte(ligne: LigneColoree, id: number, k: number, dx: number, dy: number): string {
+  const taille = Math.max(100, Math.min(400_000, Math.round(ligne.taille * k * 100)));
+  const couleur = '<a:solidFill><a:srgbClr val="' + (ligne.couleur ?? '000000') + '">' + (ligne.couleur === null ? '<a:alpha val="0"/>' : '') + '</a:srgbClr></a:solidFill>';
+  const runs = ligne.segments.map(s => '<a:r><a:rPr lang="fr-FR" sz="' + taille + '" b="' + (s.gras ? 1 : 0) + '" i="' + (s.italique ? 1 : 0) + '" dirty="0">' + couleur
+    + '<a:latin typeface="' + echapper(s.police) + '"/><a:cs typeface="' + echapper(s.police) + '"/></a:rPr><a:t>' + echapper(s.texte) + '</a:t></a:r>').join('');
+  // La boite tient la ligne avec un peu de marge : une police de remplacement plus large ne la coupe pas.
+  const largeur = (ligne.largeur * 1.1 + ligne.taille) * k, hauteur = ligne.taille * 1.25 * k;
+  const rotation = Math.round(ligne.angle * 60_000);
+  return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="Texte ' + (id - 2) + '"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>'
+    + '<p:spPr><a:xfrm' + (rotation !== 0 ? ' rot="' + rotation + '"' : '') + '><a:off x="' + emu(dx + ligne.x * k) + '" y="' + emu(dy + ligne.haut * k) + '"/>'
+    + '<a:ext cx="' + emu(largeur) + '" cy="' + emu(hauteur) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>'
+    + '<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>'
+    + '<a:p><a:pPr><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft></a:pPr>' + runs + '</a:p></p:txBody></p:sp>';
+}
+
 /** Une diapositive : l'image de la page, ajustee a la diapositive (entiere, centree). */
 function diapositive(page: PageImage, numero: number, diapo: { largeur: number; hauteur: number }): string {
   const k = Math.min(diapo.largeur / Math.max(1, page.largeur), diapo.hauteur / Math.max(1, page.hauteur));
@@ -60,6 +80,7 @@ function diapositive(page: PageImage, numero: number, diapo: { largeur: number; 
     + '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
     + '<p:spPr><a:xfrm><a:off x="' + emu((diapo.largeur - l) / 2) + '" y="' + emu((diapo.hauteur - h) / 2) + '"/><a:ext cx="' + emu(l) + '" cy="' + emu(h) + '"/></a:xfrm>'
     + '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'
+    + (page.lignes ?? []).map((ligne, i) => zoneDeTexte(ligne, i + 3, k, (diapo.largeur - l) / 2, (diapo.hauteur - h) / 2)).join('')
     + '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>';
 }
 

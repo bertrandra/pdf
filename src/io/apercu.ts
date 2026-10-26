@@ -7,7 +7,9 @@
 // gros document en demande cent d'un coup, et le fil de pdf.js les traiterait de toute facon un par un.
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { couleurDuTexte, lignesPosees, lirePolice, type FragmentVu } from '../engine/miseEnPage.js';
 import type { Fragment } from '../engine/texte.js';
+import type { LigneColoree } from '../export/ooxml.js';
 import type { Quart } from '../model/montage.js';
 
 type PdfJs = typeof import('pdfjs-dist');
@@ -102,20 +104,6 @@ export function dessinerPage(id: string, index: number, rotation: Quart, largeur
   return dessin;
 }
 
-/**
- * L'image d'une page pour une conversion (io/conversion.ts) : dessinee a la largeur demandee, encodee, puis la toile
- * rendue a la memoire. Rien n'est garde : une conversion de cent pages a 150 dpi ne doit pas remplir le cache des
- * vignettes.
- */
-export async function imageDePage(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<Uint8Array> {
-  const toile = await aTonTour(() => rendre(id, index, rotation, largeur));
-  const blob = await new Promise<Blob | null>(ok => toile.toBlob(ok, 'image/' + format, 0.88));
-  toile.width = 0;
-  toile.height = 0;
-  if (blob === null) throw new Error('Le navigateur n’a pas pu encoder l’image de la page ' + (index + 1) + '.');
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
 /** Les fragments de texte d'une page, en points dans l'espace de la page (origine en bas a gauche). */
 export async function texteDePage(id: string, index: number): Promise<Fragment[]> {
   const doc = documents.get(id);
@@ -128,5 +116,87 @@ export async function texteDePage(id: string, index: number): Promise<Fragment[]
     // La taille vient de la matrice (sa composante verticale), plus sure que `height` qui vaut 0 pour certains fragments.
     const taille = Math.hypot(t[2] ?? 0, t[3] ?? 0) || item.height;
     return [{ texte: item.str, x: t[4] ?? 0, y: t[5] ?? 0, largeur: item.width, taille, fin: item.hasEOL }];
+  });
+}
+
+/** Encode une toile en JPEG ou PNG, puis la rend a la memoire. */
+async function encoder(toile: HTMLCanvasElement, format: 'jpeg' | 'png'): Promise<Uint8Array> {
+  const blob = await new Promise<Blob | null>(ok => toile.toBlob(ok, 'image/' + format, 0.88));
+  toile.width = 0;
+  toile.height = 0;
+  if (blob === null) throw new Error('Le navigateur n’a pas pu encoder une image de page.');
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/** Les operations qui dessinent du texte : on les saute pour dessiner le fond d'une page sans son texte. */
+const OPERATIONS_DE_TEXTE = (m: PdfJs): ReadonlySet<number> =>
+  new Set([m.OPS.showText, m.OPS.showSpacedText, m.OPS.nextLineShowText, m.OPS.nextLineSetSpacingShowText]);
+
+/**
+ * Une page prete a convertir en texte modifiable (ADR-0006) : son fond (la page dessinee sans ses operations de
+ * texte) et ses lignes posees, chacune avec sa couleur, lue en comparant la page avec et sans texte. Une page sans
+ * texte rend son image entiere et aucune ligne.
+ */
+export async function pageModifiable(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<{ image: Uint8Array; lignes: LigneColoree[] }> {
+  return aTonTour(async () => {
+    const m = await pdfjs();
+    const doc = documents.get(id);
+    if (doc === undefined) throw new Error('Source inconnue : ' + id);
+    const page = await (await doc).getPage(index + 1);
+    const angle = (page.rotate + rotation) % 360;
+    const unite = page.getViewport({ scale: 1, rotation: angle });
+    const echelle = largeur / unite.width;
+    const vue = page.getViewport({ scale: echelle, rotation: angle });
+    // Le meme mode d'annotations pour la liste et les rendus : les indices des operations doivent correspondre.
+    const mode = m.AnnotationMode.ENABLE;
+    const operations = await page.getOperatorList({ annotationMode: mode });
+    const texte = OPERATIONS_DE_TEXTE(m);
+    const aSauter = new Set(operations.fnArray.flatMap((fn, i) => (texte.has(fn) ? [i] : [])));
+    const dessiner = async (filtre: ((i: number) => boolean) | undefined) => {
+      const toile = document.createElement('canvas');
+      toile.width = Math.max(1, Math.round(vue.width));
+      toile.height = Math.max(1, Math.round(vue.height));
+      await page.render({ canvas: toile, viewport: vue, background: 'white', annotationMode: mode, ...(filtre ? { operationsFilter: filtre } : {}) }).promise;
+      return toile;
+    };
+    const fond = await dessiner(aSauter.size > 0 ? i => !aSauter.has(i) : undefined);
+    if (aSauter.size === 0) return { image: await encoder(fond, format), lignes: [] };
+
+    const contenu = await page.getTextContent();
+    const fragments: FragmentVu[] = contenu.items.flatMap(item => {
+      if (!('str' in item)) return [];
+      // La matrice du fragment dans l'espace de la page vue a l'echelle 1 (origine en haut a gauche, rotation comprise).
+      const t = m.Util.transform(unite.transform, item.transform) as number[];
+      const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = t;
+      const style = contenu.styles[item.fontName];
+      let nom = '', gras = false, italique = false;
+      if (page.commonObjs.has(item.fontName)) {
+        const police = page.commonObjs.get(item.fontName) as { name?: string; bold?: boolean; italic?: boolean } | undefined;
+        nom = police?.name ?? ''; gras = police?.bold === true; italique = police?.italic === true;
+      }
+      const lue = lirePolice(nom, style?.fontFamily ?? '');
+      return [{
+        texte: item.str, x: e, y: f, largeur: item.width, taille: Math.hypot(c, d) || item.height,
+        angle: (Math.atan2(b, a) * 180) / Math.PI, ascendante: style?.ascent ?? 0.8,
+        police: lue.police, gras: gras || lue.gras, italique: italique || lue.italique, fin: item.hasEOL
+      }];
+    });
+    const lignes = lignesPosees(fragments);
+    const complete = await dessiner(undefined);
+    const lire = (toile: HTMLCanvasElement) => {
+      const donnees = toile.getContext('2d', { willReadFrequently: true })?.getImageData(0, 0, toile.width, toile.height).data ?? new Uint8ClampedArray();
+      return { donnees, largeur: toile.width, hauteur: toile.height };
+    };
+    const avec = lire(complete), sans = lire(fond);
+    complete.width = 0;
+    const colorees = lignes.map(l => {
+      // La boite de la ligne en pixels ; une ligne tournee se lit dans sa boite englobante.
+      const rad = (l.angle * Math.PI) / 180, longueur = l.largeur, haut = l.taille * 1.2;
+      const xs = [0, Math.cos(rad) * longueur, -Math.sin(rad) * haut, Math.cos(rad) * longueur - Math.sin(rad) * haut].map(v => (l.x + v) * echelle);
+      const ys = [0, Math.sin(rad) * longueur, Math.cos(rad) * haut, Math.sin(rad) * longueur + Math.cos(rad) * haut].map(v => (l.haut + v) * echelle);
+      const boite = { x: Math.min(...xs), y: Math.min(...ys), largeur: Math.max(...xs) - Math.min(...xs), hauteur: Math.max(...ys) - Math.min(...ys) };
+      return { ...l, couleur: couleurDuTexte(avec, sans, boite) };
+    });
+    return { image: await encoder(fond, format), lignes: colorees };
   });
 }

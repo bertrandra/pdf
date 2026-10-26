@@ -65,6 +65,47 @@ describe('PowerPoint', () => {
   });
 });
 
+describe('texte modifiable pose sur le fond', () => {
+  const ligne = (couleur: string | null) => ({
+    x: 50, haut: 92, largeur: 100, taille: 12, angle: 0, couleur,
+    segments: [{ texte: 'Titre & <co>', police: 'Calibri', gras: true, italique: false }, { texte: ' suite', police: 'Calibri', gras: false, italique: true }]
+  });
+  const pageAvecTexte = (couleur: string | null): PageImage => ({ ...page(595, 842), lignes: [ligne(couleur)] });
+
+  it('PowerPoint : une zone de texte par ligne, a sa place, avec police, taille, gras, italique et couleur', () => {
+    const diapo = texte(lireZip(ecrirePptx([pageAvecTexte('FFFFFF')])), 'ppt/slides/slide1.xml');
+    expect(diapo).toContain('<p:cNvSpPr txBox="1"/>');
+    expect(diapo).toContain('<a:off x="635000" y="1168400"/>');
+    expect(diapo).toContain('sz="1200" b="1" i="0"');
+    expect(diapo).toContain('sz="1200" b="0" i="1"');
+    expect(diapo).toContain('<a:srgbClr val="FFFFFF"></a:srgbClr>');
+    expect(diapo).toContain('<a:latin typeface="Calibri"/>');
+    expect(diapo).toContain('<a:t>Titre &amp; &lt;co&gt;</a:t>');
+    expect(diapo).toContain('wrap="none"');
+  });
+
+  it('PowerPoint : un texte invisible (scan OCR) reste modifiable, transparent', () => {
+    expect(texte(lireZip(ecrirePptx([pageAvecTexte(null)])), 'ppt/slides/slide1.xml')).toContain('<a:alpha val="0"/>');
+  });
+
+  it('PowerPoint : la ligne suit la mise a l echelle d une page plus petite que la diapositive', () => {
+    const diapo = texte(lireZip(ecrirePptx([page(595, 842), { ...page(297.5, 421), lignes: [ligne('000000')] }])), 'ppt/slides/slide2.xml');
+    expect(diapo).toContain('sz="2400"');
+  });
+
+  it('Word : un cadre par ligne, ancre a la page, avant le paragraphe du fond', () => {
+    const doc = texte(lireZip(ecrireDocxFidele([pageAvecTexte('1A2B3C')])), 'word/document.xml');
+    expect(doc).toContain('<w:framePr w:w="2440" w:h="312" w:hRule="exact" w:wrap="around" w:hAnchor="page" w:vAnchor="page" w:x="1000" w:y="1840"/>');
+    expect(doc).toContain('<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b/><w:color w:val="1A2B3C"/><w:sz w:val="24"/>');
+    expect(doc).toContain('<w:i/>');
+    expect(doc.indexOf('w:framePr')).toBeLessThan(doc.indexOf('wp:anchor'));
+  });
+
+  it('Word : un texte invisible n est pas pose', () => {
+    expect(texte(lireZip(ecrireDocxFidele([pageAvecTexte(null)])), 'word/document.xml')).not.toContain('w:framePr');
+  });
+});
+
 describe('Word', () => {
   it('fidele : une section par page, a sa taille et son orientation, l image derriere', () => {
     const a = lireZip(ecrireDocxFidele([page(595, 842, 1), page(842, 595, 2)]));

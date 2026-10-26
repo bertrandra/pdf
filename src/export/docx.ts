@@ -1,11 +1,12 @@
 // La conversion en Word (ADR-0005), en deux facons qui ne se melangent pas :
-// - **fidele** : chaque page du PDF devient une page Word de la meme taille, l'image de la page posee derriere,
-//   bord a bord. Rien ne bouge, mais rien ne se modifie ; une section par page, pour que les tailles suivent.
+// - **fidele** : chaque page du PDF devient une page Word de la meme taille, le fond de la page pose derriere bord a
+//   bord, et chaque ligne de texte posee a sa place dans un cadre, modifiable (ADR-0006) ; une section par page, pour
+//   que les tailles suivent. Une page sans texte lisible (un scan) reste une image.
 // - **texte** : le texte de chaque page en paragraphes (engine/texte.ts), un saut de page entre deux pages du PDF.
 //   Tout se modifie, mais la mise en page, les images et les tableaux sont perdus.
 // Le fichier ne porte que ce que Word exige (le document, ses relations, ses styles) : ni date, ni auteur.
 
-import { bornerTaille, echapper, emu, ENTETE, NS_A, NS_PIC, NS_REL_DOC, paquet, relations, typesDeContenu, type PageImage } from './ooxml.js';
+import { bornerTaille, echapper, emu, ENTETE, NS_A, NS_PIC, NS_REL_DOC, paquet, relations, typesDeContenu, type LigneColoree, type PageImage } from './ooxml.js';
 
 const NS_W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const NS_WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
@@ -76,14 +77,33 @@ function paquetWord(corps: string, medias: ReadonlyArray<readonly [string, Uint8
   );
 }
 
-/** Ecrit un document Word ou chaque page est l'image d'une page du PDF, a sa taille. */
+/**
+ * Une ligne de texte dans un cadre pose a sa place sur la page (`framePr`, ancre a la page) : le paragraphe ne prend
+ * aucune place dans le flux, et le texte reste du texte. La page a pu etre mise a l'echelle `k` (bornerTaille). Un
+ * texte invisible (la couche OCR d'un scan) n'est pas pose : Word ne sait pas le rendre transparent ; il reste dans
+ * le mode texte.
+ */
+function ligneEncadree(ligne: LigneColoree, k: number): string {
+  if (ligne.couleur === null) return '';
+  const demiPoints = Math.max(2, Math.round(ligne.taille * k * 2));
+  const largeur = twips((ligne.largeur * 1.1 + ligne.taille) * k), hauteur = twips(ligne.taille * 1.3 * k);
+  const runs = ligne.segments.map(s => '<w:r><w:rPr><w:rFonts w:ascii="' + echapper(s.police) + '" w:hAnsi="' + echapper(s.police) + '" w:cs="' + echapper(s.police) + '"/>'
+    + (s.gras ? '<w:b/>' : '') + (s.italique ? '<w:i/>' : '') + '<w:color w:val="' + ligne.couleur + '"/><w:sz w:val="' + demiPoints + '"/><w:szCs w:val="' + demiPoints + '"/></w:rPr>'
+    + '<w:t xml:space="preserve">' + echapper(s.texte) + '</w:t></w:r>').join('');
+  return '<w:p><w:pPr><w:framePr w:w="' + largeur + '" w:h="' + hauteur + '" w:hRule="exact" w:wrap="around" w:hAnchor="page" w:vAnchor="page"'
+    + ' w:x="' + twips(ligne.x * k) + '" w:y="' + twips(ligne.haut * k) + '"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>' + runs + '</w:p>';
+}
+
+/** Ecrit un document Word ou chaque page reprend une page du PDF, a sa taille, son texte modifiable pose a sa place. */
 export function ecrireDocxFidele(pages: readonly PageImage[]): Uint8Array {
   if (pages.length === 0) throw new RangeError('Aucune page à convertir.');
   const sansEspace = '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>';
   const corps = pages.map((p, i) => {
     const derniere = i === pages.length - 1;
     // La section d'une page se ferme sur son paragraphe ; celle de la derniere est celle du corps.
-    return '<w:p><w:pPr>' + sansEspace + (derniere ? '' : section(p.largeur, p.hauteur, 0)) + '</w:pPr>' + imageAncree(i + 1, 'rId' + (i + 2), p.largeur, p.hauteur) + '</w:p>'
+    const k = bornerTaille(p.largeur, p.hauteur, PAGE_MIN, PAGE_MAX).largeur / Math.max(1, p.largeur);
+    // Les cadres d'abord : un cadre s'ancre au paragraphe qui le suit, celui du fond, sur la meme page.
+    return (p.lignes ?? []).map(l => ligneEncadree(l, k)).join('') + '<w:p><w:pPr>' + sansEspace + (derniere ? '' : section(p.largeur, p.hauteur, 0)) + '</w:pPr>' + imageAncree(i + 1, 'rId' + (i + 2), p.largeur, p.hauteur) + '</w:p>'
       + (derniere ? section(p.largeur, p.hauteur, 0) : '');
   }).join('');
   return paquetWord(corps, pages.map((p, i) => ['page-' + (i + 1) + '.' + p.format, p.image] as const));

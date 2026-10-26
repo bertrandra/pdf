@@ -1,5 +1,8 @@
 # ADR-0005 — Convertir en PowerPoint et en Word
 
+> Complété par ADR-0006 : en PowerPoint et en Word mise en page conservée, le texte n'est plus dans l'image,
+> il est posé dessus, modifiable.
+
 ## Contexte
 
 On demande souvent un PDF « en PowerPoint » ou « en Word ». Il n'existe pas de conversion sans perte : un PDF

@@ -62,10 +62,14 @@ npm run e2e          # la page dans un vrai navigateur (après construire)
   (`PALIERS_VIGNETTE`), l'aperçu en pourcentage avec « Page entière », « Pleine largeur » et « 100 % ». Le calcul
   est pur (`engine/zoom.ts`) ; un dessin ne se refait qu'en franchissant un palier de rendu (`largeurDeRendu`).
   Ctrl+molette zoome sans zoomer la page, et l'aperçu garde sous le pointeur le point visé.
-- **Convertir, c'est choisir ce qu'on perd** (ADR-0005) : PowerPoint = une diapositive par page en image ; Word
-  fidèle = une page Word par page, l'image ancrée derrière, une section par page ; Word texte = des paragraphes
-  recollés par `engine/texte.ts`, sans mise en page. Les fichiers s'écrivent à la main (`export/ooxml.ts`,
-  `pptx.ts`, `docx.ts`), sans dépendance, sans date ni auteur ; la boîte dit ce que chaque choix perd.
+- **Convertir, c'est choisir ce qu'on perd** (ADR-0005) : PowerPoint = une diapositive par page ; Word mise en
+  page conservée = une page Word par page, une section par page ; Word texte au fil = des paragraphes recollés par
+  `engine/texte.ts`, sans mise en page. Les fichiers s'écrivent à la main (`export/ooxml.ts`, `pptx.ts`, `docx.ts`),
+  sans dépendance, sans date ni auteur ; la boîte dit ce que chaque choix perd.
+- **Le texte converti reste modifiable, à sa place** (ADR-0006) : le fond est la page dessinée sans ses opérations
+  de texte (`operationsFilter`) ; chaque ligne s'y pose en zone de texte (PowerPoint) ou en cadre (Word), avec
+  police, taille, gras, italique et couleur (lue en comparant les rendus avec et sans texte), calculés en pur
+  (`engine/miseEnPage.ts`). Une ligne par zone, jamais un paragraphe. Jamais de texte en image quand le PDF en a.
 - **Une couleur d'interface est un jeton** (ADR-0004) : `src/styles/jetons.ts` (couleurs, mêmes valeurs que
   `svg`), `typographie.ts` et `espaces.ts` sont la seule source ; le CSS des variables se génère au build ; la
   feuille `outils/pdf/page.css` n'écrit aucune couleur, taille de texte, rayon ni couche ; chaque texte tient

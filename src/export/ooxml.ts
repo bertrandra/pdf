@@ -3,14 +3,22 @@
 // dependance, et les memes entrees rendent les memes octets (ni date, ni auteur, ni identifiant tire). Les parties
 // facultatives qui porteraient une date (docProps/core.xml) ne sont pas ecrites.
 
+import type { LignePosee } from '../engine/miseEnPage.js';
 import { ecrireZip } from './zip.js';
 
-/** Une page a convertir en image : sa taille vue en points PDF, et l'image deja dessinee (io/conversion.ts). */
+/** Une ligne de texte posee, avec sa couleur (hexadecimale, sans diese) ; null pour un texte invisible (un scan OCR). */
+export interface LigneColoree extends LignePosee { readonly couleur: string | null }
+
+/**
+ * Une page a convertir : sa taille vue en points PDF, son fond deja dessine (io/conversion.ts), et le texte modifiable
+ * a poser dessus (ADR-0006). Le fond est la page sans son texte quand le texte est pose, la page entiere sinon.
+ */
 export interface PageImage {
   readonly largeur: number;
   readonly hauteur: number;
   readonly image: Uint8Array;
   readonly format: 'jpeg' | 'png';
+  readonly lignes?: readonly LigneColoree[];
 }
 
 /** Un point PDF (1/72 de pouce) en EMU, l'unite de DrawingML : 914 400 par pouce, donc 12 700 par point. */

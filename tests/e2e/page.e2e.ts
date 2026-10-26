@@ -121,8 +121,8 @@ describe('la page', () => {
     await expect.poll(() => page.locator('.vignette').count()).toBe(2);
     const formats = [
       ['PowerPoint (.pptx)', 'note.pptx', 'ppt/media/image2.jpeg'],
-      ['Word, mise en page fidèle (.docx)', 'note.docx', 'word/media/page-2.jpeg'],
-      ['Word, texte modifiable (.docx)', 'note.docx', 'word/document.xml']
+      ['Word, mise en page conservée (.docx)', 'note.docx', 'word/media/page-2.jpeg'],
+      ['Word, texte au fil (.docx)', 'note.docx', 'word/document.xml']
     ] as const;
     for (const [format, nom, partie] of formats) {
       await page.getByRole('button', { name: 'Convertir…' }).click();
@@ -138,13 +138,14 @@ describe('la page', () => {
       const xml = [...archive.keys()].filter(n => /\.(xml|rels)$/.test(n)).map(n => texte(archive, n));
       expect(await page.evaluate(parties => parties.filter(x => new DOMParser().parseFromString(x, 'application/xml').querySelector('parsererror') !== null).length, xml)).toBe(0);
       if (partie.endsWith('.jpeg')) {
-        // Une vraie image JPEG de la page, a 150 dpi.
+        // Une vraie image JPEG du fond de la page, a 150 dpi.
         const jpeg = archive.get(partie) ?? new Uint8Array();
         expect([jpeg[0], jpeg[1]]).toEqual([0xff, 0xd8]);
-      } else {
-        expect(texte(archive, partie)).toContain('Bonjour 1');
-        expect(texte(archive, partie)).toContain('Bonjour 2');
       }
+      // Dans les trois formats, le texte est du texte : on le retrouve dans les parties XML, modifiable.
+      const tout = xml.join('');
+      expect(tout).toContain('Bonjour 1');
+      expect(tout).toContain('Bonjour 2');
       await expect.poll(() => page.locator('[role=status]').textContent()).toContain('« ' + nom + ' » enregistré');
     }
     expect(erreurs).toEqual([]);
