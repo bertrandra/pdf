@@ -12,7 +12,8 @@ la structure mais ne dessine pas.
   L'écriture se fait sans date, sans producteur et sans identifiant tiré (`updateMetadata: false`) : mêmes sources
   et même montage, mêmes octets (`tests/unit/export/assemblage.test.ts`).
 - **pdfjs-dist 5.4.296**, épinglé exactement, ne sert qu'aux aperçus (`io/apercu.ts`). Il n'est pas empaqueté :
-  `scripts/construire.mjs` recopie `pdf.min.mjs` et son fil de travail dans `dist/pdfjs/`, chargés au premier
+  `scripts/construire.mjs` recopie `pdf.min.mjs` et son fil de travail dans `dist/pdfjs/`, **renommés en `.js`**
+  (un module exige un type JavaScript, qu'un hébergeur comme SiteGround ne donne pas à `.mjs`), chargés au premier
   aperçu. `isEvalSupported: false`. Rien de ce qu'il dessine n'entre dans un fichier écrit.
 - Au plus deux rendus à la fois ; un dessin se garde par page, rotation et largeur de rendu (400 au plus).
 

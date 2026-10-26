@@ -25,8 +25,10 @@ function pdfjs(): Promise<PdfJs> {
   if (module === null) {
     const base = new URL(DOSSIER_PDFJS, document.baseURI).href;
     // Une adresse calculee : esbuild laisse l'import tel quel, et le navigateur le resout a l'execution.
-    const chargement = (import(/* @vite-ignore */ base + 'pdf.min.mjs') as Promise<PdfJs>).then(m => {
-      m.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
+    // Des modules ES servis en .js (scripts/construire.mjs) : un navigateur exige un type JavaScript pour un module, et
+    // un hebergeur ordinaire n'en donne aucun a .mjs (SiteGround), alors que tous le donnent a .js.
+    const chargement = (import(/* @vite-ignore */ base + 'pdf.min.js') as Promise<PdfJs>).then(m => {
+      m.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
       return m;
     });
     chargement.catch(() => { module = null; });
@@ -36,19 +38,35 @@ function pdfjs(): Promise<PdfJs> {
 }
 
 const documents = new Map<string, Promise<PDFDocumentProxy>>();
+/** Les octets de chaque source declaree : de quoi la rouvrir si la premiere ouverture a echoue (pdf.js pas encore la). */
+const octetsDesSources = new Map<string, Uint8Array>();
 
 /** Fait connaitre a pdf.js les octets d'une source. Une copie part au fil de travail : l'original reste a nous. */
 export function declarerSource(id: string, octets: Uint8Array): void {
-  if (documents.has(id)) return;
+  octetsDesSources.set(id, octets);
+  void ouvrir(id).catch(() => undefined);
+}
+
+/**
+ * Le document pdf.js d'une source, ouvert une fois. Une ouverture qui echoue n'est pas gardee : la suivante la retente,
+ * et c'est sa vraie raison (pdf.js absent, fichier refuse) qui remonte, pas « source inconnue ».
+ */
+function ouvrir(id: string): Promise<PDFDocumentProxy> {
+  const deja = documents.get(id);
+  if (deja !== undefined) return deja;
+  const octets = octetsDesSources.get(id);
+  if (octets === undefined) return Promise.reject(new Error('Source inconnue : ' + id));
   const ouverture = pdfjs().then(m => m.getDocument({ data: octets.slice(), isEvalSupported: false }).promise);
-  ouverture.catch(() => documents.delete(id));
+  ouverture.catch(() => { if (documents.get(id) === ouverture) documents.delete(id); });
   documents.set(id, ouverture);
+  return ouverture;
 }
 
 /** Oublie une source qui n'est plus montee, et ses dessins. */
 export function oublierSource(id: string): void {
   const doc = documents.get(id);
   documents.delete(id);
+  octetsDesSources.delete(id);
   void doc?.then(d => d.destroy()).catch(() => undefined);
   for (const cle of [...dessins.keys()]) if (cle.startsWith(id + ':')) dessins.delete(cle);
 }
@@ -70,9 +88,7 @@ async function aTonTour<T>(travail: () => Promise<T>): Promise<T> {
 /** Dessine une page dans une toile neuve, sans rien garder. Le fond est blanc, comme le papier : sans lui, une page
  * transparente deviendrait noire en JPEG. */
 async function rendre(id: string, index: number, rotation: Quart, largeur: number): Promise<HTMLCanvasElement> {
-  const doc = documents.get(id);
-  if (doc === undefined) throw new Error('Source inconnue : ' + id);
-  const page = await (await doc).getPage(index + 1);
+  const page = await (await ouvrir(id)).getPage(index + 1);
   const angle = (page.rotate + rotation) % 360;
   const unite = page.getViewport({ scale: 1, rotation: angle });
   const vue = page.getViewport({ scale: largeur / unite.width, rotation: angle });
@@ -107,9 +123,7 @@ export function dessinerPage(id: string, index: number, rotation: Quart, largeur
 
 /** Les fragments de texte d'une page, en points dans l'espace de la page (origine en bas a gauche). */
 export async function texteDePage(id: string, index: number): Promise<Fragment[]> {
-  const doc = documents.get(id);
-  if (doc === undefined) throw new Error('Source inconnue : ' + id);
-  const page = await (await doc).getPage(index + 1);
+  const page = await (await ouvrir(id)).getPage(index + 1);
   const contenu = await page.getTextContent();
   return contenu.items.flatMap(item => {
     if (!('str' in item)) return [];
@@ -141,9 +155,7 @@ const OPERATIONS_DE_TEXTE = (m: PdfJs): ReadonlySet<number> =>
 export async function pageModifiable(id: string, index: number, rotation: Quart, largeur: number, format: 'jpeg' | 'png'): Promise<{ image: Uint8Array; lignes: LigneColoree[]; scannee: boolean }> {
   return aTonTour(async () => {
     const m = await pdfjs();
-    const doc = documents.get(id);
-    if (doc === undefined) throw new Error('Source inconnue : ' + id);
-    const page = await (await doc).getPage(index + 1);
+    const page = await (await ouvrir(id)).getPage(index + 1);
     const angle = (page.rotate + rotation) % 360;
     const unite = page.getViewport({ scale: 1, rotation: angle });
     const echelle = largeur / unite.width;

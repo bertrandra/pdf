@@ -5,6 +5,12 @@ sémantique : un changement des octets écrits pour les mêmes entrées est une 
 
 ## [Non publié]
 
+### Corrigé
+
+- La page se charge chez un hébergeur qui ne donne pas de type aux fichiers `.mjs` (SiteGround) : pdf.js est livré en
+  `.js`, et la construction refuse tout fichier `.mjs` dans `dist/`. Une source que pdf.js n'a pas pu ouvrir est
+  rouverte au besoin, et c'est la vraie raison qui s'affiche, plus « Source inconnue ».
+
 ### Ajouté
 
 - La page se publie comme artefact claude.ai (`npm run artefact`) : l’enregistrement passe alors par l’hôte, qui

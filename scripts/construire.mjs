@@ -5,9 +5,9 @@
 // L'OCR suit la meme regle (ADR-0007) : tesseract.js, son travailleur et son coeur sans SIMD sont recopies dans
 // dist/ocr/, les modeles verifies par scripts/modeles-ocr.mjs.
 //
-//   npm run construire   -> dist/pdf.html, dist/pdfjs/pdf.min.mjs, dist/pdfjs/pdf.worker.min.mjs, dist/ocr/
+//   npm run construire   -> dist/pdf.html, dist/pdfjs/pdf.min.js, dist/pdfjs/pdf.worker.min.js, dist/ocr/
 
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { annoncer, depuisRacine, ecrireDansDist, empaqueter, enKo, refuserFinDeScript } from './aide.mjs';
 import { copierModeles } from './modeles-ocr.mjs';
 
@@ -43,7 +43,9 @@ ecrireDansDist('pdf.html', complete);
 annoncer('Page construite', 'pdf.html', enKo(moteur.length) + ' Ko de moteur, ' + enKo(complete.length) + ' Ko en tout');
 
 mkdirSync(depuisRacine('dist/pdfjs'), { recursive: true });
-for (const f of ['pdf.min.mjs', 'pdf.worker.min.mjs']) copyFileSync(depuisRacine('node_modules/pdfjs-dist/build', f), depuisRacine('dist/pdfjs', f));
+// Recopies en .js : ce sont des modules ES, et un navigateur refuse un module sans type JavaScript ; un hebergeur
+// ordinaire (SiteGround) n'en donne aucun a .mjs, tous le donnent a .js. Le navigateur ne regarde pas l'extension.
+for (const f of ['pdf.min', 'pdf.worker.min']) copyFileSync(depuisRacine('node_modules/pdfjs-dist/build', f + '.mjs'), depuisRacine('dist/pdfjs', f + '.js'));
 const version = JSON.parse(readFileSync(depuisRacine('node_modules/pdfjs-dist/package.json'), 'utf8')).version;
 annoncer('pdf.js recopié', 'pdfjs/', 'version ' + version);
 
@@ -64,3 +66,11 @@ writeFileSync(depuisRacine('dist/ocr/worker.min.js'), travailleur.replace(FAUTE,
 const versionOcr = JSON.parse(readFileSync(tesseract + '/package.json', 'utf8')).version;
 annoncer('tesseract.js recopié', 'ocr/', 'version ' + versionOcr);
 await copierModeles();
+
+// Aucun fichier livre en .mjs : sur un hebergeur qui ne lui donne pas de type, la page ne se chargerait pas.
+const listerMjs = dossier => readdirSync(dossier, { withFileTypes: true }).flatMap(e => {
+  const chemin = dossier + '/' + e.name;
+  return e.isDirectory() ? listerMjs(chemin) : chemin.endsWith('.mjs') ? [chemin] : [];
+});
+const mjs = listerMjs(depuisRacine('dist'));
+if (mjs.length > 0) throw new Error('Fichiers .mjs dans dist/ : ' + mjs.join(', ') + ' — les livrer en .js.');

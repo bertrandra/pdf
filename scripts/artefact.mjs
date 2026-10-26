@@ -31,7 +31,7 @@ ecrireDansDist('artefact/index.html', artefact);
 annoncer('Page d’artefact', 'artefact/index.html', enKo(artefact.length) + ' Ko');
 
 // Les fichiers charges a la demande : les scripts nettoyes, les modeles (binaires, compresses) tels quels.
-const scripts = ['pdfjs/pdf.min.mjs', 'pdfjs/pdf.worker.min.mjs', 'ocr/tesseract.min.js', 'ocr/worker.min.js', 'ocr/tesseract-core-lstm.wasm.js'];
+const scripts = ['pdfjs/pdf.min.js', 'pdfjs/pdf.worker.min.js', 'ocr/tesseract.min.js', 'ocr/worker.min.js', 'ocr/tesseract-core-lstm.wasm.js'];
 for (const f of scripts) {
   mkdirSync(dirname(depuisRacine('dist/artefact', f)), { recursive: true });
   writeFileSync(depuisRacine('dist/artefact', f), sansControles(readFileSync(depuisRacine('dist', f), 'utf8')));
